@@ -1,0 +1,90 @@
+<!doctype html>
+<html lang="uz">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Navo AI by: Firdavs</title>
+  <meta name="theme-color" content="#10131f">
+  <script>
+    if (['5500','5501','5502','5503'].includes(location.port) && new URLSearchParams(location.search).get('navo') !== 'visible') {
+      const liveServerUrl = new URL(location.href);
+      liveServerUrl.searchParams.set('navo', 'visible');
+      history.replaceState(history.state, '', liveServerUrl);
+    }
+  </script>
+  <link rel="manifest" href="./manifest.webmanifest">
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@500;600;700&family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200">
+  <link rel="stylesheet" href="./css/styles.css?v=18">
+  <style id="critical-boot-style">
+    .boot-screen{position:fixed;inset:0;z-index:9999;display:grid;place-items:center;background:#070914;color:#8d96ad;transition:opacity .55s ease,visibility .55s ease}
+    .boot-screen.is-closing{opacity:0;visibility:hidden;pointer-events:none}.boot-screen[hidden]{display:none}
+    .boot-content{display:grid;justify-items:center;gap:18px;width:min(90vw,760px)}
+    .boot-preview{position:relative;display:flex;width:100%;height:min(58vh,420px);overflow:hidden;background:#0c101e;border:1px solid #273154;border-radius:22px;box-shadow:0 28px 90px #0008}
+    .boot-preview-sidebar{display:flex;width:27%;flex-direction:column;gap:16px;padding:25px 18px;background:#101527;border-right:1px solid #202944}
+    .boot-preview-main{display:flex;flex:1;flex-direction:column;align-items:center;padding:25px}
+    .skeleton-menu{width:26px;height:12px;margin-bottom:20px}.skeleton-button{width:82%;height:34px;margin-bottom:19px}.skeleton-line{width:88%;height:11px}.skeleton-line.short{width:42%;height:8px;margin-bottom:5px}.skeleton-user{align-self:flex-end;width:100px;height:28px;border-radius:999px}.skeleton-hero{display:grid;width:75%;gap:14px;margin-top:17%}.skeleton-title{width:72%;height:36px}.skeleton-subtitle{width:92%;height:25px}.skeleton-cards{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;width:82%;margin-top:38px}.skeleton-cards span{height:82px}.skeleton-input{width:82%;height:44px;margin-top:auto}
+    .skeleton-menu,.skeleton-button,.skeleton-line,.skeleton-user,.skeleton-title,.skeleton-subtitle,.skeleton-cards span,.skeleton-input{display:block;border-radius:10px;background:linear-gradient(100deg,#182038 20%,#687394 38%,#182038 56%);background-size:300% 100%;animation:critical-shimmer 1.8s ease-in-out infinite}
+    .boot-status{display:flex;align-items:center;gap:15px}.boot-status p{font:12px Arial,sans-serif;letter-spacing:.06em}.boot-loader{display:flex;gap:8px}.boot-loader span{width:7px;height:7px;border-radius:50%;background:#51d7ff;animation:critical-pulse 1.15s infinite}.boot-loader span:nth-child(2){animation-delay:.15s;background:#8b7cff}.boot-loader span:nth-child(3){animation-delay:.3s;background:#ff72c6}
+    @keyframes critical-shimmer{0%{background-position:100% 0}100%{background-position:-100% 0}}@keyframes critical-pulse{50%{transform:translateY(-4px);opacity:.45}}
+    @media(max-width:768px){.boot-preview{height:330px}.boot-preview-sidebar{width:23%;padding:18px 10px}.boot-preview-main{padding:18px 12px}.skeleton-hero,.skeleton-cards,.skeleton-input{width:92%}.skeleton-cards{grid-template-columns:repeat(2,1fr)}}
+  </style>
+</head>
+<body>
+  <div class="boot-screen" id="boot-screen">
+    <div class="boot-content">
+      <div class="boot-preview" aria-label="Sayt yuklanmoqda">
+        <div class="boot-preview-sidebar">
+          <span class="skeleton-menu"></span>
+          <span class="skeleton-button"></span>
+          <span class="skeleton-line short"></span>
+          <span class="skeleton-line"></span>
+          <span class="skeleton-line"></span>
+        </div>
+        <div class="boot-preview-main">
+          <span class="skeleton-user"></span>
+          <div class="skeleton-hero">
+            <span class="skeleton-title"></span>
+            <span class="skeleton-subtitle"></span>
+          </div>
+          <div class="skeleton-cards"><span></span><span></span><span></span><span></span></div>
+          <span class="skeleton-input"></span>
+        </div>
+      </div>
+      <div class="boot-status"><div class="boot-loader"><span></span><span></span><span></span></div><p>Interfeys tayyorlanmoqda<span class="loading-dots">...</span></p></div>
+    </div>
+  </div>
+  <div class="auth-screen" id="auth-screen" hidden>
+    <section class="auth-card">
+      <div class="auth-brand"><span class="material-symbols-outlined">auto_awesome</span> Navo AI by: Firdavs</div>
+      <h1 id="auth-title">Ro'yxatdan o'ting</h1>
+      <p class="auth-subtitle" id="auth-subtitle">Email yoki telefon raqamingiz bilan hisob yarating.</p>
+      <div class="auth-tabs">
+        <button class="auth-tab" data-mode="login" type="button">Kirish</button>
+        <button class="auth-tab active" data-mode="register" type="button">Ro'yxatdan o'tish</button>
+      </div>
+      <form id="auth-form">
+        <label class="auth-field"><span class="auth-label">Email yoki telefon raqam</span><input id="auth-identity" required autocomplete="username" placeholder="ism@gmail.com yoki +998901234567"></label>
+        <label class="auth-field"><span class="auth-label">Parol</span><input id="auth-password" required type="password" minlength="8" autocomplete="current-password" placeholder="Kamida 8 belgi"></label>
+        <label class="auth-field" id="nickname-field"><span class="auth-label">Nickname</span><input id="auth-nickname" minlength="2" maxlength="40" placeholder="Masalan: Dasturchi"></label>
+        <label class="auth-field" id="code-field" hidden><span class="auth-label">Tasdiqlash kodi</span><div class="code-row"><input id="auth-code" inputmode="numeric" maxlength="6" placeholder="6 xonali kod"><button class="code-resend" id="resend-code" type="button">Qayta yuborish</button></div></label>
+        <button class="primary-btn auth-submit" type="submit">Ro'yxatdan o'tish</button>
+      </form>
+      <div class="auth-divider"><span>yoki</span></div>
+      <button class="google-btn" id="google-login" type="button"><span class="material-symbols-outlined">passkey</span> Google orqali kirish</button>
+      <button class="auth-link" id="forgot-password" type="button" hidden>Parolni unutdingizmi?</button>
+      <p class="auth-error" id="auth-error" role="alert"></p>
+      <div class="auth-loader" id="auth-loader" hidden><span></span><span></span><span></span></div>
+    </section>
+  </div>
+  <div class="profile-modal" id="profile-modal" hidden><section class="profile-card"><button class="profile-close" id="profile-close" type="button">×</button><h2>Profilni tahrirlash</h2><p>Nickname va avataringizni o'zgartiring.</p><label class="avatar-picker"><img id="profile-avatar-preview" alt="Avatar"><span class="material-symbols-outlined">photo_camera</span><input id="profile-avatar-input" type="file" accept="image/*" hidden></label><label class="auth-field"><span class="auth-label">Nickname</span><input id="profile-nickname" maxlength="40"></label><button class="primary-btn" id="profile-save" type="button">Saqlash</button><p class="profile-message" id="profile-message"></p></section></div>
+  <div class="app-container">
+    <aside class="sidebar" id="sidebar"><div class="sidebar-top"><div class="sidebar-brand"><span class="brand-mark"><span class="material-symbols-outlined">auto_awesome</span></span><span class="brand-name">navo<span>ai</span></span></div><button class="menu-toggle" id="menu-toggle" type="button" aria-label="Yon panelni yopish yoki ochish"><span class="material-symbols-outlined">menu</span></button><button class="new-chat" type="button"><span class="material-symbols-outlined plus-icon">add</span><span class="new-chat-text">Yangi chat</span></button></div><div class="sidebar-recent"><p class="recent-title">Suhbatlaringiz</p><div class="recent-list"><p class="recent-empty">Yangi suhbatlaringiz shu yerda ko‘rinadi.</p></div></div><div class="sidebar-bottom"><button class="bottom-item" id="help-btn" type="button"><span class="material-symbols-outlined">help</span><span class="bottom-item-text">Yordam</span></button><button class="bottom-item" id="settings-open" type="button"><span class="material-symbols-outlined">settings</span><span class="bottom-item-text">Sozlamalar</span></button></div></aside>
+      <main class="main-content"><header class="header"><div class="header-info"><button class="icon-btn mobile-menu-btn" id="mobile-menu-btn" type="button" aria-label="Menyu"><span class="material-symbols-outlined">menu</span></button><div class="model-chip"><span class="status-dot"></span> Navo · Gemini</div></div><div class="user-area"><div class="user-pill"><div class="user-avatar" id="user-avatar">U</div><span class="user-name" id="user-name">Foydalanuvchi</span></div><button class="icon-btn logout-btn" id="logout-btn" type="button" title="Hisobdan chiqish"><span class="material-symbols-outlined">logout</span></button><button class="icon-btn settings-header-btn" id="settings-header-open" type="button" title="Sozlamalar"><span class="material-symbols-outlined">tune</span></button></div></header>
+      <div class="chat-container"><div class="welcome-screen" id="welcome-screen"><div class="welcome-eyebrow"><span class="status-dot"></span> G‘oyadan natijagacha — birga</div><div class="greet"><span class="gradient-text">Salom,</span></div><div class="sub-greet">Bugun nimani kashf qilamiz?</div><p class="welcome-copy">Savolingizni bering, fikringizni ulashing yoki shunchaki boshlang.</p><div class="suggestion-cards"><button class="card" type="button"><p>Yangi React loyihasi yaratish uchun qadamlarni yozib ber</p><span class="material-symbols-outlined">code</span><span class="card-label">Dasturlash</span></button><button class="card" type="button"><p>Kundalik reja tuzishda yordam ber</p><span class="material-symbols-outlined">edit_document</span><span class="card-label">Rejalashtirish</span></button><button class="card" type="button"><p>Murakkab mavzuni oddiy qilib tushuntir</p><span class="material-symbols-outlined">lightbulb</span><span class="card-label">O‘rganish</span></button><button class="card" type="button"><p>Tadbir uchun g‘oyalar o‘ylab top</p><span class="material-symbols-outlined">explore</span><span class="card-label">Ijod</span></button></div></div><div class="chat-history" id="chat-history"></div></div>
+      <div class="input-container"><div class="input-box"><textarea id="prompt-input" rows="1" placeholder="Shu yerga yozing..."></textarea><div class="input-actions"><button class="icon-btn" id="image-upload-btn" type="button" title="Rasm yuklash"><span class="material-symbols-outlined">add_photo_alternate</span></button><button class="icon-btn attach-btn" id="attach-btn" type="button" title="Fayl biriktirish"><span class="material-symbols-outlined">attach_file</span></button><button class="icon-btn" id="voice-btn" type="button" title="Ovoz bilan yozish"><span class="material-symbols-outlined">mic</span></button><button class="icon-btn send-btn" id="send-btn" type="button" title="Yuborish"><span class="material-symbols-outlined">send</span></button></div></div><input id="file-input" type="file" hidden accept="image/*,.txt,.md,.csv,.json,.pdf"><div class="file-preview" id="file-preview" hidden></div><p class="disclaimer">Navo AI javoblari sun’iy intellekt tomonidan yaratiladi — muhim ma’lumotlarni tekshiring.</p></div>
+    </main>
+  </div>
+  <div class="settings-overlay" id="settings-overlay" hidden><section class="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title"><button class="modal-close" id="settings-close" type="button" aria-label="Yopish"><span class="material-symbols-outlined">close</span></button><div class="settings-heading"><span class="material-symbols-outlined settings-symbol">tune</span><div><h2 id="settings-title">Sozlamalar</h2><p>Navo AI’ni o‘zingizga moslang</p></div></div><div class="settings-option"><div><strong>Tashqi ko‘rinish</strong><p>Qorong‘i va yorug‘ rejimni almashtiring</p></div><button class="theme-switch" id="theme-toggle" type="button" aria-pressed="false"><span class="material-symbols-outlined">dark_mode</span><span id="theme-label">Qorong‘i</span></button></div><div class="settings-option settings-api"><div class="api-status-mark"><span class="status-dot"></span></div><div><strong>Gemini API ulanishi</strong><p>Kalit serverda xavfsiz saqlanadi. `.env` ichida GEMINI_API_KEY ni sozlang.</p></div></div><div class="settings-actions"><button class="primary-btn" id="settings-done" type="button">Tayyor</button></div><p class="settings-note" id="settings-note" role="status"></p></section></div>
+  <script src="./js/api.js?v=7"></script><script src="./js/app.js?v=19"></script>
+</body>
+</html>
