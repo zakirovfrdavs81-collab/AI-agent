@@ -4,7 +4,18 @@ document.addEventListener('DOMContentLoaded', () => {
     if (window.performance && performance.getEntriesByType('navigation')[0]?.type === 'reload') {
         document.documentElement.classList.add('fresh-live-server-load');
     }
-    const API_BASE = window.location.port === '8000' ? '' : 'http://127.0.0.1:8000';
+    const LOCAL_API_BASE = 'http://127.0.0.1:8000';
+    const RENDER_API_BASE = 'https://ai-agent-n9gf.onrender.com';
+    const API_BASE = (() => {
+        const hostname = window.location.hostname;
+        if (hostname === '127.0.0.1' || hostname === 'localhost') {
+            return LOCAL_API_BASE;
+        }
+        if (hostname.endsWith('.onrender.com')) {
+            return `https://${hostname}`;
+        }
+        return RENDER_API_BASE;
+    })();
     const bootScreen = document.getElementById('boot-screen');
     const authScreen = document.getElementById('auth-screen');
     const authForm = document.getElementById('auth-form');

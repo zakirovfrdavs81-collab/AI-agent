@@ -43,14 +43,26 @@ CODE_TTL = 600
 CODE_RESEND_SECONDS = 45
 MAX_CODE_ATTEMPTS = 5
 DAILY_MESSAGE_LIMIT = int(os.getenv("DAILY_MESSAGE_LIMIT", "30"))
-APP_ORIGIN = os.getenv("APP_ORIGIN", "http://127.0.0.1:8000")
+APP_ORIGIN = os.getenv("APP_ORIGIN", "http://127.0.0.1:5506")
+ALLOWED_ORIGINS = [
+    origin
+    for origin in {
+        APP_ORIGIN,
+        "http://127.0.0.1:5506",
+        "http://localhost:5506",
+        "http://127.0.0.1:8000",
+        "http://localhost:8000",
+        "https://ai-agent-n9gf.onrender.com",
+    }
+    if origin
+]
 
 password_hash = PasswordHash.recommended()
 app = FastAPI(title="Gemini Chat")
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[APP_ORIGIN],
-    allow_origin_regex=r"http://(127\.0\.0\.1|localhost):\d+",
+    allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=r"https?://(127\.0\.0\.1|localhost|.*\.onrender\.com):?\d*",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
