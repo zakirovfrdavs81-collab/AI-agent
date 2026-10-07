@@ -1,0 +1,405 @@
+<!doctype html>
+<html lang="uz" class="no-js">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Navo AI — fikringizga yo‘l oching</title>
+    <meta name="description" content="Navo AI — o‘zbek tilidagi aqlli yordamchi. Ovoz, fayllar va hujjatlar bilan ishlaydigan premium AI yordamchi taqdimoti." />
+    <meta name="theme-color" content="#08090f" />
+    <link rel="icon" type="image/svg+xml" href="./assets/logo.svg" />
+    <link rel="apple-touch-icon" href="./assets/logo-192.png" />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap" />
+    <script src="./vendor/tailwind.js"></script>
+    <script>
+      tailwind.config = {
+        theme: {
+          extend: {
+            colors: {
+              ink: "#08090f",
+              panel: "#12131f",
+              violet: { DEFAULT: "#7b6bee", bright: "#a99bfa" },
+              mint: "#8ce4ce",
+            },
+            fontFamily: {
+              display: ["Sora", "Manrope", "sans-serif"],
+              sans: ["Manrope", "system-ui", "sans-serif"],
+            },
+          },
+        },
+      };
+    </script>
+    <link rel="stylesheet" href="./css/showcase.css" />
+    <script>
+      // JS bor: reveal holatlari ishlaydi. Xato bo'lsa preloader va yashirin
+      // kontent darhol ochiladi (sahifa hech qachon bo'sh qolmaydi).
+      document.documentElement.classList.remove("no-js");
+      document.documentElement.classList.add("js");
+      const unlock = () => {
+        document.documentElement.classList.add("fallback");
+        const preloader = document.querySelector("[data-preloader]");
+        if (preloader) preloader.classList.add("is-done");
+      };
+      window.addEventListener("error", unlock, true);
+      window.setTimeout(unlock, 8000);
+    </script>
+  </head>
+  <body class="font-sans antialiased">
+    <!-- Kirish ekrani -->
+    <div class="preloader" data-preloader>
+      <img src="./assets/logo.svg" alt="Navo AI" width="58" height="58" />
+      <div class="preloader-bar"><span></span></div>
+      <p class="m-0 text-[11px] font-semibold tracking-[.22em] text-[#9c99b4] uppercase">Navo AI yuklanmoqda</p>
+    </div>
+
+    <!-- Maxsus kursor -->
+    <span class="cursor-dot" data-cursor-dot aria-hidden="true"></span>
+    <span class="cursor-ring" data-cursor-ring aria-hidden="true"><span class="cursor-label" data-cursor-label></span></span>
+    <canvas class="cursor-trail" data-cursor-trail aria-hidden="true"></canvas>
+
+    <!-- Fon: WebGL zarrachalar + panjara + donadorlik -->
+    <div class="bg-scene" data-scene aria-hidden="true"></div>
+    <div class="bg-grid" aria-hidden="true"></div>
+    <div class="grain" aria-hidden="true"></div>
+
+    <header class="site-nav" data-nav>
+      <div class="mx-auto flex h-[68px] w-full max-w-[1240px] items-center justify-between px-5 sm:px-8">
+        <a class="flex items-center gap-3 no-underline" href="#top" data-cursor="">
+          <img class="h-9 w-9 rounded-xl" src="./assets/logo.svg" alt="Navo AI logotipi" width="36" height="36" />
+          <span class="font-display text-[17px] font-extrabold tracking-[-.04em] text-[#eae8f5]">Navo<span class="text-[#a99bfa]">.ai</span></span>
+        </a>
+        <nav class="hidden items-center gap-8 md:flex">
+          <a class="nav-link" href="#imkoniyatlar">Imkoniyatlar</a>
+          <a class="nav-link" href="#jarayon">Ish jarayoni</a>
+          <a class="nav-link" href="#natijalar">Natijalar</a>
+        </nav>
+        <a class="btn btn-primary !px-5 !py-2.5 !text-[.82rem]" href="#" data-app-link data-magnetic="0.24" data-cursor="Ochish">
+          Ilovani ochish
+          <span class="btn-icon" aria-hidden="true">→</span>
+        </a>
+      </div>
+      <div class="divider"></div>
+    </header>
+
+    <main class="page" id="top">
+      <!-- ================= HERO ================= -->
+      <section class="relative mx-auto flex min-h-screen w-full max-w-[1240px] flex-col justify-center gap-14 px-5 pt-32 pb-20 sm:px-8 lg:flex-row lg:items-center lg:gap-10">
+        <div class="relative z-10 lg:w-[56%]">
+          <span class="eyebrow" data-reveal data-reveal-on="load" data-cursor="">
+            <span class="dot-live"></span> O‘zbek tilidagi AI yordamchi
+          </span>
+
+          <h1 class="display mt-7 text-[clamp(2.7rem,7.6vw,5.2rem)]" data-hero>
+            <span class="block" data-split="char" data-reveal-on="load" data-reveal-delay="0.06">Fikringizga</span>
+            <span class="block gradient-text" data-split="char" data-reveal-on="load" data-reveal-delay="0.2">aniqlik bering.</span>
+          </h1>
+
+          <p class="mt-7 max-w-[34rem] text-[1.02rem] leading-relaxed text-[#9c99b4]" data-reveal data-reveal-on="load">
+            Savollaringizni tushunarli javoblarga, g‘oyalaringizni tayyor rejalarga aylantiradigan
+            yordamchi. Ovoz bilan gaplashing, fayl yuklang va natijani bir zumda oling.
+          </p>
+
+          <div class="mt-9 flex flex-wrap items-center gap-4" data-reveal data-reveal-on="load">
+            <a class="btn btn-primary" href="#" data-app-link data-magnetic="0.3" data-cursor="Boshlash">
+              Navo AI’ni ochish
+              <span class="btn-icon" aria-hidden="true">→</span>
+            </a>
+            <a class="btn btn-ghost" href="#imkoniyatlar" data-magnetic="0.26" data-cursor="">
+              Imkoniyatlarni ko‘rish
+            </a>
+          </div>
+
+          <div class="mt-10 flex flex-wrap items-center gap-x-7 gap-y-3 text-[.78rem] text-[#7f7c96]" data-reveal data-reveal-on="load">
+            <span class="flex items-center gap-2"><span class="dot-live"></span> Ovoz va matn bir joyda</span>
+            <span>PDF · Word · Excel · Rasm</span>
+            <span>O‘zbek tilida ravon</span>
+          </div>
+        </div>
+
+        <div class="relative z-10 lg:w-[44%]" data-parallax="0.12">
+          <div class="tilt glass mx-auto max-w-[26rem] rounded-[26px] p-5 shadow-[0_40px_120px_rgba(0,0,0,.55)]" data-tilt="10" data-cursor="">
+            <span class="tilt-glare" aria-hidden="true"></span>
+            <div class="tilt-inner">
+              <div class="mb-4 flex items-center gap-3">
+                <img class="h-8 w-8 rounded-[10px]" src="./assets/logo.svg" alt="" width="32" height="32" />
+                <div class="leading-tight">
+                  <p class="m-0 text-[.82rem] font-bold">Navo 2.5</p>
+                  <p class="m-0 flex items-center gap-1.5 text-[.68rem] text-[#8ce4ce]"><span class="dot-live"></span> Onlayn</p>
+                </div>
+                <span class="ml-auto text-[.62rem] tracking-[.14em] text-[#6f6c88] uppercase">Fast</span>
+              </div>
+
+              <div class="flex flex-col gap-3 text-[.82rem]">
+                <p class="m-0 ml-auto max-w-[80%] rounded-2xl rounded-br-md bg-[rgba(123,107,238,.22)] px-4 py-3 text-[#e9e5ff]">
+                  Bugungi uchrashuv uchun 5 punktdan iborat reja tuzib ber.
+                </p>
+                <div class="max-w-[92%] rounded-2xl rounded-bl-md border border-[rgba(154,148,200,.16)] bg-[rgba(255,255,255,.04)] px-4 py-3 text-[#cfcbdf]">
+                  <p class="m-0 mb-2 text-[.7rem] font-semibold tracking-[.14em] text-[#8ce4ce] uppercase">Navo AI</p>
+                  <span class="block">1. Maqsad va natijani bir jumlada yozamiz.</span>
+                  <span class="block">2. Har bir punkt uchun mas’ul va muddat.</span>
+                  <span class="block">3. Eng xatarli joy — bog‘liqliklar ro‘yxati.</span>
+                </div>
+                <div class="flex items-center gap-2 text-[.7rem] text-[#7f7c96]">
+                  <span class="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-[#8ce4ce]"></span>
+                  Yozmoqda…
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="absolute top-8 -left-8 z-20 hidden rounded-2xl border border-[rgba(154,148,200,.16)] bg-[rgba(18,19,31,.8)] px-4 py-3 backdrop-blur sm:block" data-parallax="0.3">
+            <p class="m-0 text-[.66rem] tracking-[.16em] text-[#9c99b4] uppercase">Ovoz</p>
+            <p class="m-0 font-display text-[.95rem] font-bold">Gaplashib yozdirish</p>
+          </div>
+          <div class="absolute -bottom-7 -right-3 z-20 hidden rounded-2xl border border-[rgba(154,148,200,.16)] bg-[rgba(18,19,31,.8)] px-4 py-3 backdrop-blur sm:block" data-parallax="0.22">
+            <p class="m-0 text-[.66rem] tracking-[.16em] text-[#9c99b4] uppercase">Eksport</p>
+            <p class="m-0 font-display text-[.95rem] font-bold">PDF · Word · Matn</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= IMKONIYATLAR LENTASI ================= -->
+      <section class="relative border-y border-[rgba(154,148,200,.16)] bg-[rgba(255,255,255,.012)] py-6" data-cursor="">
+        <div class="marquee" data-marquee>
+          <div class="marquee-track" data-marquee-track>
+            <span class="display text-[1.5rem] whitespace-nowrap text-[#eae8f5] opacity-80">Ovoz bilan suhbat</span>
+            <span class="display text-[1.5rem] opacity-80 text-[#7b6bee]">✳</span>
+            <span class="display text-[1.5rem] whitespace-nowrap text-[#eae8f5] opacity-80">Fayllarni tahlil qilish</span>
+            <span class="display text-[1.5rem] opacity-80 text-[#8ce4ce]">✳</span>
+            <span class="display text-[1.5rem] whitespace-nowrap text-[#eae8f5] opacity-80">Tezkor javob</span>
+            <span class="display text-[1.5rem] opacity-80 text-[#7b6bee]">✳</span>
+            <span class="display text-[1.5rem] whitespace-nowrap text-[#eae8f5] opacity-80">PDF va Word eksport</span>
+            <span class="display text-[1.5rem] opacity-80 text-[#8ce4ce]">✳</span>
+            <span class="display text-[1.5rem] whitespace-nowrap text-[#eae8f5] opacity-80">Statistika paneli</span>
+            <span class="display text-[1.5rem] opacity-80 text-[#7b6bee]">✳</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= IMKONIYATLAR ================= -->
+      <section class="relative mx-auto w-full max-w-[1240px] px-5 py-24 sm:px-8" id="imkoniyatlar">
+        <div class="max-w-[46rem]">
+          <span class="eyebrow" data-reveal data-cursor=""><span class="dot-live"></span> Imkoniyatlar</span>
+          <h2 class="display mt-6 text-[clamp(2rem,4.6vw,3.2rem)]" data-reveal>
+            Kunlik ishingizni yengillashtiradigan <span class="gradient-text">asosiy qurollar</span>
+          </h2>
+          <p class="mt-5 text-[.95rem] leading-relaxed text-[#9c99b4]" data-reveal>
+            Har bir detal o‘zbek tilidagi suhbat uchun moslangan: yozing, gapiring, fayl yuklang —
+            Navo tushunadi va aniq javob qaytaradi.
+          </p>
+        </div>
+
+        <div class="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+          <article class="tilt glass rounded-[22px] p-6" data-tilt="7" data-reveal data-cursor="">
+            <span class="tilt-glare" aria-hidden="true"></span>
+            <div class="tilt-inner">
+              <span class="icon-chip">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z" /><path d="M19 10a7 7 0 0 1-14 0" /><path d="M12 17v5" /></svg>
+              </span>
+              <h3 class="mt-5 mb-2 font-display text-[1.06rem] font-bold">Ovoz bilan suhbat</h3>
+              <p class="m-0 text-[.86rem] leading-relaxed text-[#9c99b4]">
+                Mikrofon tugmasini bosing va gapiring — Navo nutqni matnga aylantirib, darhol javob beradi.
+              </p>
+            </div>
+          </article>
+
+          <article class="tilt glass rounded-[22px] p-6" data-tilt="7" data-reveal data-cursor="">
+            <span class="tilt-glare" aria-hidden="true"></span>
+            <div class="tilt-inner">
+              <span class="icon-chip">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><path d="M14 2v6h6" /></svg>
+              </span>
+              <h3 class="mt-5 mb-2 font-display text-[1.06rem] font-bold">Fayllarni o‘qish</h3>
+              <p class="m-0 text-[.86rem] leading-relaxed text-[#9c99b4]">
+                PDF, Word, Excel, matn va rasmlarni yuklang — xulosa, jadval yoki tayyor xat oling.
+              </p>
+            </div>
+          </article>
+
+          <article class="tilt glass rounded-[22px] p-6" data-tilt="7" data-reveal data-cursor="">
+            <span class="tilt-glare" aria-hidden="true"></span>
+            <div class="tilt-inner">
+              <span class="icon-chip">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M13 2 3 14h8l-1 8 11-13h-8z" /></svg>
+              </span>
+              <h3 class="mt-5 mb-2 font-display text-[1.06rem] font-bold">Tez va aniq javob</h3>
+              <p class="m-0 text-[.86rem] leading-relaxed text-[#9c99b4]">
+                Google’ning eng yangi Flash modeli ishlatiladi; model almashsa tizim o‘zi zaxiraga o‘tadi.
+              </p>
+            </div>
+          </article>
+
+          <article class="tilt glass rounded-[22px] p-6" data-tilt="7" data-reveal data-cursor="">
+            <span class="tilt-glare" aria-hidden="true"></span>
+            <div class="tilt-inner">
+              <span class="icon-chip">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12" /><path d="m7 10 5 5 5-5" /><path d="M5 21h14" /></svg>
+              </span>
+              <h3 class="mt-5 mb-2 font-display text-[1.06rem] font-bold">Eksport qilish</h3>
+              <p class="m-0 text-[.86rem] leading-relaxed text-[#9c99b4]">
+                Javobni PDF, Word yoki oddiy matn sifatida saqlang va hamkasblaringiz bilan bo‘lishing.
+              </p>
+            </div>
+          </article>
+
+          <article class="tilt glass rounded-[22px] p-6" data-tilt="7" data-reveal data-cursor="">
+            <span class="tilt-glare" aria-hidden="true"></span>
+            <div class="tilt-inner">
+              <span class="icon-chip">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18" /><path d="M7 15v3" /><path d="M12 10v8" /><path d="M17 6v12" /></svg>
+              </span>
+              <h3 class="mt-5 mb-2 font-display text-[1.06rem] font-bold">Statistika</h3>
+              <p class="m-0 text-[.86rem] leading-relaxed text-[#9c99b4]">
+                Suhbatlar soni, kunlik limit va haftalik faollik grafigi — hammasi bitta toza panelda.
+              </p>
+            </div>
+          </article>
+
+          <article class="tilt glass rounded-[22px] p-6" data-tilt="7" data-reveal data-cursor="">
+            <span class="tilt-glare" aria-hidden="true"></span>
+            <div class="tilt-inner">
+              <span class="icon-chip">
+                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><path d="m9 12 2 2 4-4" /></svg>
+              </span>
+              <h3 class="mt-5 mb-2 font-display text-[1.06rem] font-bold">Xavfsiz hisob</h3>
+              <p class="m-0 text-[.86rem] leading-relaxed text-[#9c99b4]">
+                Email, telefon yoki Google orqali kirish; API kalit hech qachon brauzerga chiqmaydi.
+              </p>
+            </div>
+          </article>
+        </div>
+      </section>
+
+      <!-- ================= ISH JARAYONI (drag galereya) ================= -->
+      <section class="relative py-24" id="jarayon">
+        <div class="orb orb-violet -top-10 left-[8%] h-[26rem] w-[26rem]" data-parallax="0.36" aria-hidden="true"></div>
+        <div class="mx-auto w-full max-w-[1240px] px-5 sm:px-8">
+          <div class="flex flex-wrap items-end justify-between gap-6">
+            <div class="max-w-[38rem]">
+              <span class="eyebrow" data-reveal data-cursor=""><span class="dot-live"></span> Ish jarayoni</span>
+              <h2 class="display mt-6 text-[clamp(2rem,4.6vw,3.2rem)]" data-reveal>
+                To‘rt qadamda <span class="gradient-text">tayyor natija</span>
+              </h2>
+              <p class="mt-5 text-[.95rem] leading-relaxed text-[#9c99b4]" data-reveal>
+                Kartalarni ushlab yon tomonga suring — jarayonning har bir bosqichi shu yerda.
+              </p>
+            </div>
+            <div class="flex items-center gap-3" data-reveal>
+              <button class="btn btn-ghost !h-12 !w-12 !p-0" data-gallery-prev data-magnetic="0.2" data-cursor="Orqaga" aria-label="Oldingi qadam">←</button>
+              <button class="btn btn-ghost !h-12 !w-12 !p-0" data-gallery-next data-magnetic="0.2" data-cursor="Keyingi" aria-label="Keyingi qadam">→</button>
+            </div>
+          </div>
+
+          <div class="gallery-viewport mt-12 -mx-5 px-5 sm:-mx-8 sm:px-8" data-gallery data-cursor="Surish" tabindex="0" aria-label="Ish jarayoni qadamlari">
+            <div class="gallery-track" data-gallery-track>
+              <article class="gallery-card glass rounded-[26px] p-7">
+                <p class="display m-0 text-[3.2rem] text-[#7b6bee] opacity-70">01</p>
+                <h3 class="mt-4 mb-2 font-display text-[1.15rem] font-bold">So‘rang</h3>
+                <p class="m-0 text-[.88rem] leading-relaxed text-[#9c99b4]">
+                  Savolni yozing yoki mikrofon orqali ayting. Navo o‘zbek tilini tabiiy tushunadi.
+                </p>
+              </article>
+              <article class="gallery-card glass rounded-[26px] p-7">
+                <p class="display m-0 text-[3.2rem] text-[#8ce4ce] opacity-70">02</p>
+                <h3 class="mt-4 mb-2 font-display text-[1.15rem] font-bold">Fayllang</h3>
+                <p class="m-0 text-[.88rem] leading-relaxed text-[#9c99b4]">
+                  Hujjat, jadval yoki rasm qo‘shsangiz — Navo ularni ham o‘qib, hisobga oladi.
+                </p>
+              </article>
+              <article class="gallery-card glass rounded-[26px] p-7">
+                <p class="display m-0 text-[3.2rem] text-[#a99bfa] opacity-70">03</p>
+                <h3 class="mt-4 mb-2 font-display text-[1.15rem] font-bold">Javob oling</h3>
+                <p class="m-0 text-[.88rem] leading-relaxed text-[#9c99b4]">
+                  Tuzilgan, aniq javob bir necha soniyada tayyor bo‘ladi — kerak bo‘lsa ovoz bilan eshitib oling.
+                </p>
+              </article>
+              <article class="gallery-card glass rounded-[26px] p-7">
+                <p class="display m-0 text-[3.2rem] text-[#7b6bee] opacity-70">04</p>
+                <h3 class="mt-4 mb-2 font-display text-[1.15rem] font-bold">Eksport</h3>
+                <p class="m-0 text-[.88rem] leading-relaxed text-[#9c99b4]">
+                  Natijani PDF yoki Word qilib saqlang, nusxalab oling yoki suhbatda davom eting.
+                </p>
+              </article>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= NATIJALAR (hisoblagichlar) ================= -->
+      <section class="relative mx-auto w-full max-w-[1240px] px-5 pb-24 sm:px-8" id="natijalar">
+        <div class="glass rounded-[28px] p-8 sm:p-12">
+          <div class="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
+            <div data-reveal>
+              <p class="stat-number gradient-text" data-count="30">30</p>
+              <p class="mt-3 text-[.82rem] text-[#9c99b4]">Kunlik xabar limiti — har foydalanuvchi uchun bepul</p>
+            </div>
+            <div data-reveal>
+              <p class="stat-number gradient-text" data-count="6">6</p>
+              <p class="mt-3 text-[.82rem] text-[#9c99b4]">Fayl turi: PDF, Word, Excel, matn, rasm va CSV</p>
+            </div>
+            <div data-reveal>
+              <p class="stat-number gradient-text" data-count="3">3</p>
+              <p class="mt-3 text-[.82rem] text-[#9c99b4]">Kirish usuli: email, telefon va Google akkaunt</p>
+            </div>
+            <div data-reveal>
+              <p class="stat-number gradient-text" data-count="24" data-count-suffix="/7">24/7</p>
+              <p class="mt-3 text-[.82rem] text-[#9c99b4]">Server uzluksiz ishlaydi; model almashsa zaxiraga o‘tadi</p>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= CTA ================= -->
+      <section class="relative overflow-hidden py-28">
+        <div class="orb orb-mint right-[6%] -bottom-16 h-[22rem] w-[22rem]" data-parallax="0.4" aria-hidden="true"></div>
+        <div class="mx-auto w-full max-w-[1240px] px-5 text-center sm:px-8">
+          <span class="eyebrow" data-reveal data-cursor=""><span class="dot-live"></span> Boshlashga tayyor</span>
+          <h2 class="display mx-auto mt-7 max-w-[46rem] text-[clamp(2.2rem,5.6vw,3.8rem)]" data-split="word">
+            Bugun yozing, ertaga vaqt tejang.
+          </h2>
+          <p class="mx-auto mt-6 max-w-[34rem] text-[.98rem] leading-relaxed text-[#9c99b4]" data-reveal>
+            Hisob yaratish 30 soniya vaqt oladi: email yoki telefon raqamingizni kiriting, kodni tasdiqlang
+            va suhbatni boshlang.
+          </p>
+          <div class="mt-10 flex flex-wrap items-center justify-center gap-4" data-reveal>
+            <a class="btn btn-primary !px-8 !py-4" href="#" data-app-link data-magnetic="0.32" data-cursor="Boshlash">
+              Navo AI’ni ochish
+              <span class="btn-icon" aria-hidden="true">→</span>
+            </a>
+            <a class="btn btn-ghost !px-8 !py-4" href="#imkoniyatlar" data-magnetic="0.26" data-cursor="">
+              Yana ko‘rib chiqish
+            </a>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= FOOTER ================= -->
+      <footer class="relative border-t border-[rgba(154,148,200,.16)] py-10">
+        <div class="mx-auto flex w-full max-w-[1240px] flex-wrap items-center justify-between gap-6 px-5 sm:px-8">
+          <div class="flex items-center gap-3">
+            <img class="h-8 w-8 rounded-[10px]" src="./assets/logo.svg" alt="Navo AI" width="32" height="32" />
+            <div class="leading-tight">
+              <p class="m-0 font-display text-[.95rem] font-bold">Navo<span class="text-[#a99bfa]">.ai</span></p>
+              <p class="m-0 text-[.72rem] text-[#7f7c96]">O‘zbek tilidagi aqlli yordamchi</p>
+            </div>
+          </div>
+          <p class="m-0 max-w-[30rem] text-[.74rem] leading-relaxed text-[#6f6c88]">
+            Bu sahifa — Navo AI ilovasining taqdimot sahifasi. Ilova FastAPI serverida
+            <span class="text-[#9c99b4]" data-api-origin>shu sayt manzilida</span> ishlaydi.
+          </p>
+          <p class="m-0 text-[.72rem] text-[#6f6c88]">© <span id="year">2026</span> Navo AI</p>
+        </div>
+      </footer>
+    </main>
+
+    <script src="./vendor/gsap.min.js"></script>
+    <script src="./vendor/ScrollTrigger.min.js"></script>
+    <script src="./vendor/lenis.min.js"></script>
+    <script type="module" src="./js/main.js"></script>
+    <script>
+      const year = document.getElementById("year");
+      if (year) year.textContent = String(new Date().getFullYear());
+    </script>
+  </body>
+</html>

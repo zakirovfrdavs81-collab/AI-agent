@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Navo AI by: Firdavs</title>
+  <title>Navo AI — fikrlaringizga yo‘l oching</title>
   <meta name="theme-color" content="#10131f">
   <script>
     if (['5500','5501','5502','5503'].includes(location.port) && new URLSearchParams(location.search).get('navo') !== 'visible') {
@@ -55,7 +55,7 @@
   </div>
   <div class="auth-screen" id="auth-screen" hidden>
     <section class="auth-card">
-      <div class="auth-brand"><span class="material-symbols-outlined">auto_awesome</span> Navo AI by: Firdavs</div>
+      <div class="auth-brand"><span class="material-symbols-outlined">auto_awesome</span> Navo AI</div>
       <h1 id="auth-title">Ro'yxatdan o'ting</h1>
       <p class="auth-subtitle" id="auth-subtitle">Email yoki telefon raqamingiz bilan hisob yarating.</p>
       <div class="auth-tabs">
@@ -85,6 +85,7 @@
     </main>
   </div>
   <div class="settings-overlay" id="settings-overlay" hidden><section class="settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title"><button class="modal-close" id="settings-close" type="button" aria-label="Yopish"><span class="material-symbols-outlined">close</span></button><div class="settings-heading"><span class="material-symbols-outlined settings-symbol">tune</span><div><h2 id="settings-title">Sozlamalar</h2><p>Navo AI’ni o‘zingizga moslang</p></div></div><div class="settings-option"><div><strong>Tashqi ko‘rinish</strong><p>Qorong‘i va yorug‘ rejimni almashtiring</p></div><button class="theme-switch" id="theme-toggle" type="button" aria-pressed="false"><span class="material-symbols-outlined">dark_mode</span><span id="theme-label">Qorong‘i</span></button></div><div class="settings-option settings-api"><div class="api-status-mark"><span class="status-dot"></span></div><div><strong>Gemini API ulanishi</strong><p>Kalit serverda xavfsiz saqlanadi. `.env` ichida GEMINI_API_KEY ni sozlang.</p></div></div><div class="settings-actions"><button class="primary-btn" id="settings-done" type="button">Tayyor</button></div><p class="settings-note" id="settings-note" role="status"></p></section></div>
-  <script src="./js/api.js?v=7"></script><script src="./js/app.js?v=19"></script>
+  <script type="module" src="./js/config.js?v=1"></script>
+  <script src="./js/api.js?v=8"></script><script src="./js/app.js?v=20"></script>
 </body>
 </html>

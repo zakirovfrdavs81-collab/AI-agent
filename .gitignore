@@ -3,3 +3,6 @@
 __pycache__/
 *.pyc
 app.db
+node_modules/
+dist/
+*копия*

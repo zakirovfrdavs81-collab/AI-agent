@@ -4,7 +4,7 @@
  * Muvaffaqiyatli javob: { text, used_today, daily_limit }
  * Xato bo'lsa: status kodi biriktirilgan Error tashlanadi.
  */
-async function fetchGeminiResponse(prompt, attachment = null, apiBase = "") {
+async function fetchGeminiResponse(prompt, attachment = null, apiBase = window.NAVO_CONFIG?.API_BASE_URL || window.location.origin) {
     let response;
     try {
         response = await fetch(`${apiBase}/api/chat`, {

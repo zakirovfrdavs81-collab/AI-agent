@@ -1,0 +1,399 @@
+/* =============================================================================
+   Navo AI — premium taqdimot sahifasi
+   Qatlamlar: 1) asosiy 2) fon/atmosfera 3) komponentlar 4) animatsiya holatlari
+   ============================================================================= */
+
+:root {
+  --ink: #08090f;
+  --panel: #12131f;
+  --violet: #7b6bee;
+  --violet-bright: #a99bfa;
+  --mint: #8ce4ce;
+  --text: #eae8f5;
+  --muted: #9c99b4;
+  --line: rgba(154, 148, 200, .16);
+  --ease-out: cubic-bezier(.22, 1, .36, 1);
+  --ease-soft: cubic-bezier(.4, 0, .2, 1);
+  --shadow-lg: 0 40px 120px rgba(0, 0, 0, .55);
+}
+
+* { box-sizing: border-box; }
+
+html { -webkit-text-size-adjust: 100%; }
+
+body {
+  margin: 0;
+  background: var(--ink);
+  color: var(--text);
+  font-family: "Manrope", "Sora", system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+  line-height: 1.6;
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Lenis ishlaganda sahifa transform qilinadi — scrollbar bilan kelishmovchilikni oldini olamiz */
+html.lenis, html.lenis body { height: auto; }
+.lenis.lenis-smooth { scroll-behavior: auto !important; }
+.lenis.lenis-stopped { overflow: hidden; }
+
+::selection { background: rgba(123, 107, 238, .35); color: #fff; }
+::-webkit-scrollbar { width: 9px; }
+::-webkit-scrollbar-track { background: #0b0c14; }
+::-webkit-scrollbar-thumb { background: linear-gradient(var(--violet), #4a3f9c); border-radius: 9px; }
+
+/* --- 1. Asosiy tipografiya -------------------------------------------------- */
+
+.display {
+  font-family: "Sora", "Manrope", sans-serif;
+  font-weight: 800;
+  letter-spacing: -.045em;
+  line-height: .96;
+  text-wrap: balance;
+}
+
+.gradient-text {
+  background: linear-gradient(102deg, #fff 4%, var(--violet-bright) 46%, var(--mint) 96%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+
+.eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: .55rem;
+  padding: .42rem .85rem;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  background: rgba(255, 255, 255, .03);
+  color: var(--muted);
+  font-size: .7rem;
+  font-weight: 600;
+  letter-spacing: .16em;
+  text-transform: uppercase;
+}
+
+.dot-live {
+  width: 7px; height: 7px;
+  border-radius: 50%;
+  background: var(--mint);
+  box-shadow: 0 0 0 0 rgba(140, 228, 206, .6);
+  animation: pulse 2.6s infinite;
+}
+
+@keyframes pulse {
+  0% { box-shadow: 0 0 0 0 rgba(140, 228, 206, .55); }
+  70% { box-shadow: 0 0 0 12px rgba(140, 228, 206, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(140, 228, 206, 0); }
+}
+
+/* --- 2. Fon va atmosfera ---------------------------------------------------- */
+
+.bg-scene { position: fixed; inset: 0; z-index: 0; pointer-events: none; }
+.bg-scene canvas { display: block; width: 100%; height: 100%; }
+
+.bg-grid {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  opacity: .35;
+  background-image:
+    linear-gradient(rgba(154, 148, 200, .06) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(154, 148, 200, .06) 1px, transparent 1px);
+  background-size: 62px 62px;
+  mask-image: radial-gradient(circle at 50% 22%, #000 12%, transparent 74%);
+  -webkit-mask-image: radial-gradient(circle at 50% 22%, #000 12%, transparent 74%);
+}
+
+.grain {
+  position: fixed;
+  inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  opacity: .2;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='140' height='140'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='3'/></filter><rect width='140' height='140' filter='url(%23n)' opacity='.42'/></svg>");
+}
+
+.orb { position: absolute; border-radius: 50%; filter: blur(90px); opacity: .5; will-change: transform; }
+.orb-violet { background: radial-gradient(circle, rgba(123, 107, 238, .75), transparent 68%); }
+.orb-mint { background: radial-gradient(circle, rgba(140, 228, 206, .5), transparent 68%); }
+
+.page { position: relative; z-index: 2; }
+
+/* --- 3. Komponentlar -------------------------------------------------------- */
+
+.glass {
+  background: linear-gradient(150deg, rgba(255, 255, 255, .065), rgba(255, 255, 255, .018));
+  border: 1px solid var(--line);
+  backdrop-filter: blur(16px) saturate(140%);
+  -webkit-backdrop-filter: blur(16px) saturate(140%);
+}
+
+.divider { height: 1px; background: linear-gradient(90deg, transparent, var(--line) 22%, var(--line) 78%, transparent); }
+
+/* Tugma: suyuq to'ldirish hover effekti */
+.btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: .6rem;
+  padding: 1rem 1.7rem;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  color: var(--text);
+  font-size: .9rem;
+  font-weight: 650;
+  letter-spacing: -.01em;
+  text-decoration: none;
+  cursor: pointer;
+  overflow: hidden;
+  isolation: isolate;
+  transition: transform .45s var(--ease-out), border-color .4s ease, color .4s ease;
+}
+
+.btn::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: -1;
+  background: linear-gradient(105deg, var(--violet), var(--mint));
+  transform: translateY(101%);
+  transition: transform .55s var(--ease-out);
+}
+
+.btn:hover::after { transform: translateY(0); }
+.btn:hover { border-color: transparent; color: #0a0b12; }
+.btn .btn-icon { transition: transform .45s var(--ease-out); }
+.btn:hover .btn-icon { transform: translateX(4px); }
+
+.btn-primary {
+  border-color: transparent;
+  background: linear-gradient(105deg, var(--violet), var(--mint));
+  color: #0a0b12;
+}
+
+.btn-primary::after { background: linear-gradient(105deg, #fff, #dfe9ff); }
+.btn-ghost { background: rgba(255, 255, 255, .025); }
+
+[data-magnetic] { will-change: transform; }
+
+/* Tilt kartalar */
+.tilt {
+  position: relative;
+  transform-style: preserve-3d;
+  transition: transform .5s var(--ease-out), border-color .4s ease, box-shadow .5s ease;
+  will-change: transform;
+}
+
+.tilt-glare {
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .4s ease;
+  background: radial-gradient(340px circle at var(--mx, 50%) var(--my, 50%), rgba(255, 255, 255, .16), transparent 62%);
+}
+
+.tilt:hover .tilt-glare { opacity: 1; }
+/* Diqqat: translateZ + backdrop-filter birgalikda Chrome'da karta ichini
+   siljitib yuboradi, shuning uchun chuqurlik soya va glare orqali beriladi. */
+.tilt-inner { position: relative; z-index: 1; perspective: 900px; }
+
+.icon-chip {
+  display: grid;
+  place-items: center;
+  width: 42px; height: 42px;
+  border: 1px solid var(--line);
+  border-radius: 13px;
+  background: linear-gradient(150deg, rgba(169, 142, 255, .24), rgba(140, 228, 206, .1));
+  color: #f2ecff;
+}
+
+/* Galereya (drag) */
+.gallery-viewport { overflow: hidden; cursor: grab; }
+.gallery-viewport.is-dragging { cursor: grabbing; }
+.gallery-track { display: flex; gap: 1.4rem; will-change: transform; }
+.gallery-card { flex: 0 0 auto; width: min(78vw, 27rem); }
+
+/* Marquee */
+.marquee { display: flex; overflow: hidden; mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent); -webkit-mask-image: linear-gradient(90deg, transparent, #000 12%, #000 88%, transparent); }
+.marquee-track { display: flex; gap: 2.4rem; padding-right: 2.4rem; flex: 0 0 auto; animation: marquee 34s linear infinite; }
+.marquee:hover .marquee-track { animation-play-state: paused; }
+
+@keyframes marquee { to { transform: translateX(-100%); } }
+
+.stat-number {
+  font-family: "Sora", sans-serif;
+  font-weight: 800;
+  font-size: clamp(2.4rem, 6vw, 4.2rem);
+  letter-spacing: -.05em;
+  line-height: 1;
+}
+
+/* Navigatsiya */
+.site-nav {
+  position: fixed;
+  top: 0; left: 0; right: 0;
+  z-index: 40;
+  border-bottom: 1px solid transparent;
+  transition: transform .55s var(--ease-out), background .5s ease, border-color .5s ease;
+}
+
+.site-nav.is-scrolled {
+  background: rgba(9, 10, 17, .72);
+  border-bottom-color: var(--line);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+}
+
+.site-nav.is-hidden { transform: translateY(-102%); }
+
+.nav-link { position: relative; color: var(--muted); font-size: .82rem; font-weight: 600; text-decoration: none; transition: color .3s ease; }
+
+.nav-link::after {
+  content: "";
+  position: absolute;
+  left: 0; bottom: -6px;
+  width: 100%; height: 1px;
+  background: linear-gradient(90deg, var(--violet-bright), var(--mint));
+  transform: scaleX(0);
+  transform-origin: left;
+  transition: transform .45s var(--ease-out);
+}
+
+.nav-link:hover, .nav-link.is-active { color: var(--text); }
+.nav-link:hover::after, .nav-link.is-active::after { transform: scaleX(1); }
+
+/* --- 4. Maxsus kursor ------------------------------------------------------- */
+
+.cursor-dot, .cursor-ring {
+  position: fixed;
+  top: 0; left: 0;
+  z-index: 90;
+  pointer-events: none;
+  border-radius: 50%;
+  opacity: 0;
+  will-change: transform;
+}
+
+.cursor-dot { width: 7px; height: 7px; margin: -3.5px 0 0 -3.5px; background: var(--text); }
+
+.cursor-ring {
+  display: grid;
+  place-items: center;
+  width: 42px; height: 42px;
+  margin: -21px 0 0 -21px;
+  border: 1px solid rgba(234, 232, 245, .55);
+  mix-blend-mode: difference;
+  transition: width .35s var(--ease-out), height .35s var(--ease-out), margin .35s var(--ease-out),
+              background .35s ease, border-color .35s ease;
+}
+
+.cursor-label {
+  color: #0a0b12;
+  font-size: .58rem;
+  font-weight: 700;
+  letter-spacing: .12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+  opacity: 0;
+  transform: scale(.72);
+  transition: opacity .3s ease, transform .35s var(--ease-out);
+}
+
+/* Kursor faqat sichqonchasi bor (aniq) qurilmalarda ko'rinadi va ishlaydi. */
+@media (hover: none), (pointer: coarse) {
+  .cursor-dot, .cursor-ring, .cursor-trail { display: none !important; }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  html.has-cursor .cursor-dot, html.has-cursor .cursor-ring { opacity: 1; }
+  html.has-cursor, html.has-cursor a, html.has-cursor button, html.has-cursor [data-cursor] { cursor: none; }
+}
+
+.cursor-ring.is-active {
+  width: 94px; height: 94px;
+  margin: -47px 0 0 -47px;
+  border-color: transparent;
+  background: rgba(233, 230, 250, .93);
+}
+
+.cursor-ring.is-active .cursor-label { opacity: 1; transform: scale(1); }
+.cursor-ring.is-view { width: 76px; height: 76px; margin: -38px 0 0 -38px; }
+
+.cursor-trail {
+  position: fixed;
+  inset: 0;
+  z-index: 85;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity .4s ease;
+}
+
+html.has-cursor .cursor-trail { opacity: .9; }
+
+/* --- 5. Kirish animatsiyasi va reveal holatlari ----------------------------- */
+
+.preloader {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 1.3rem;
+  background: radial-gradient(circle at 50% 45%, #17162a, #08090f 70%);
+  transition: opacity .8s ease, visibility .8s ease;
+}
+
+.preloader.is-done { opacity: 0; visibility: hidden; }
+.preloader-bar { width: min(240px, 60vw); height: 2px; border-radius: 2px; background: rgba(255, 255, 255, .1); overflow: hidden; }
+.preloader-bar span { display: block; width: 40%; height: 100%; background: linear-gradient(90deg, var(--violet), var(--mint)); animation: load 1.15s var(--ease-soft) infinite; }
+
+@keyframes load {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(250%); }
+}
+
+/* JS bor bo'lsa (html.js) reveal elementlari dastlab yashirin turadi */
+.js [data-reveal] { opacity: 0; transform: translateY(30px); }
+
+.js [data-reveal].is-visible {
+  opacity: 1;
+  transform: none;
+  transition: opacity .95s var(--ease-out), transform 1.05s var(--ease-out);
+}
+
+/* Bo'laklarga ajratilgan sarlavhalar (kinetic typography) */
+[data-split] { line-height: 1.12; }
+[data-split] .split-char, [data-split] .split-word { transform-origin: 50% 100%; }
+
+/* Xavfsizlik to'ri: JS xato bersa ham kontent ko'rinadi */
+html.fallback [data-reveal] { opacity: 1 !important; transform: none !important; }
+html.fallback .preloader { display: none; }
+
+/* Tilt paytida real vaqt kuzatuvi uchun o'tishni o'chiramiz */
+.tilt.is-tilting { transition: box-shadow .5s ease; }
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+  }
+  .js [data-reveal] { opacity: 1; transform: none; }
+  .cursor-dot, .cursor-ring, .cursor-trail { display: none; }
+  .grain { display: none; }
+}
+
+@media (max-width: 900px) {
+  .orb { filter: blur(70px); opacity: .38; }
+  .grain { opacity: .13; }
+  .cursor-ring { display: none; }
+}
+
+

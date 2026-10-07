@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite --host 127.0.0.1",
     "build": "vite build",
+    "watch": "vite build --watch",
     "preview": "vite preview --host 127.0.0.1"
   },
   "dependencies": {
@@ -14,7 +15,8 @@
     "react-dom": "^19.0.0",
     "react-markdown": "^9.0.1",
     "rehype-sanitize": "^6.0.0",
-    "remark-gfm": "^4.0.0"
+    "remark-gfm": "^4.0.0",
+    "three": "^0.186.1"
   },
   "devDependencies": {
     "@vitejs/plugin-react": "^4.3.4",

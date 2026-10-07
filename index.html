@@ -5,11 +5,50 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#10131f" />
     <meta name="description" content="Navo AI — o‘zbek tilidagi aqlli yordamchingiz." />
-    <link rel="icon" href="/manifest.webmanifest" />
+    <link rel="icon" type="image/svg+xml" href="/logo.svg" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/logo-192.png" />
+    <link rel="apple-touch-icon" href="/logo-192.png" />
+    <link rel="mask-icon" href="/logo.svg" color="#7b6bee" />
+    <link rel="manifest" href="/manifest.webmanifest" />
     <title>Navo AI — fikringizga yo‘l oching</title>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <main data-app-loading style="min-height:100vh;display:grid;place-items:center;padding:24px;background:#10131f;color:#f4f2fa;font:16px system-ui,sans-serif;text-align:center">
+        <div><strong>Navo AI ishga tushmoqda...</strong><p style="color:#aaa8b8">Bir oz kuting yoki sahifani yangilang.</p></div>
+      </main>
+    </div>
+    <script>
+      function showStartupError() {
+        const loading = document.querySelector("[data-app-loading]");
+        if (!loading) return;
+        const message = document.createElement("main");
+        message.setAttribute("role", "alert");
+        message.style.cssText = "min-height:100vh;display:grid;place-items:center;padding:24px;background:#10131f;color:#f4f2fa;font:16px system-ui,sans-serif;text-align:center";
+        const content = document.createElement("div");
+        const title = document.createElement("strong");
+        title.textContent = "Navo AI ishga tushmadi";
+        const detail = document.createElement("p");
+        detail.style.color = "#aaa8b8";
+        detail.textContent = "run.bat oynasida server ishlayotganini tekshiring, so‘ng sahifani yangilang.";
+        const retry = document.createElement("button");
+        retry.type = "button";
+        retry.textContent = "Sahifani yangilash";
+        retry.style.cssText = "padding:10px 18px;color:#fff;background:#6954d8;border:0;border-radius:8px;cursor:pointer";
+        retry.addEventListener("click", () => window.location.reload());
+        content.append(title, detail, retry);
+        message.append(content);
+        loading.replaceWith(message);
+      }
+      window.addEventListener("error", (event) => {
+        if (event.target instanceof HTMLScriptElement && event.target.type === "module") showStartupError();
+      }, true);
+      window.setTimeout(showStartupError, 12000);
+      const sourceEntry = document.querySelector('script[type="module"][src="/src/main.jsx"]');
+      if (sourceEntry && window.location.pathname === "/" && window.location.port !== "5173") {
+        window.location.replace("/dist/");
+      }
+    </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>
 </html>

@@ -1,4 +1,6 @@
-const apiBase = import.meta.env.VITE_API_BASE || "";
+import { API_BASE_URL } from "../js/config.js";
+
+export const apiBase = API_BASE_URL;
 
 export async function apiRequest(path, options = {}) {
   let response;
