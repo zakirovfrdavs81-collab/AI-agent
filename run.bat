@@ -27,6 +27,10 @@ if not exist "dist\assets" goto :dist_missing
 echo.
 echo Sayt manzili:       http://127.0.0.1:5507
 echo Taqdimot sahifasi:  http://127.0.0.1:5507/showcase/
+echo Google JavaScript origin: http://127.0.0.1:5507
+echo Google JavaScript origin: http://localhost:5507
+echo Vite JavaScript origin:   http://127.0.0.1:5173
+echo Google redirect URI:      http://127.0.0.1:5507/api/auth/google/callback
 echo Serverni to'xtatish uchun Ctrl+C bosing.
 python -m uvicorn main:app --host 127.0.0.1 --port 5507
 echo.

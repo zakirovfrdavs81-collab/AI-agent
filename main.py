@@ -48,7 +48,6 @@ MAX_CODE_ATTEMPTS = 5
 DAILY_MESSAGE_LIMIT = int(os.getenv("DAILY_MESSAGE_LIMIT", "30"))
 APP_ORIGIN = (
     os.getenv("APP_ORIGIN")
-    or os.getenv("RENDER_EXTERNAL_URL")
     or "http://127.0.0.1:5507"
 ).rstrip("/")
 FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", APP_ORIGIN).rstrip("/")

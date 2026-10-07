@@ -30,17 +30,13 @@ npm run dev
 ```
 
 Vite 5173-portda ishga tushadi: <http://127.0.0.1:5173>. Bu manzilda JSX
-brauzer uchun avtomatik o'giriladi va har o'zgarish darhol ko'rinadi. `/api`
-so'rovlari `vite.config.js` orqali 5507-portdagi FastAPI'ga proksilanadi.
-VS Code Live Server esa yig'ilgan `dist` frontendni 5507-portda ochadi va
-API'ga CORS orqali 5507-portdan ulanadi.
+brauzer uchun avtomatik o'giriladi va har o'zgarish darhol ko'rinadi. Frontend
+API so'rovlari lokal FastAPI'ning 5507-portiga yuboriladi. VS Code Live Server
+esa yig'ilgan `dist` frontendni 5507-portda ochadi.
 
-Frontenddagi API manzili `js/config.js` ichidagi `API_BASE_URL` orqali
-markazlashtirilgan. Bir originli deployda avtomatik joriy sayt manzili ishlaydi.
-Boshqa API manzili yoki lokal backend porti kerak bo'lsa, loyiha ildizidagi
-`.env` faylida `VITE_API_BASE_URL=https://api.example.com`,
-`VITE_BACKEND_HOST=127.0.0.1` va `VITE_BACKEND_PORT=5507` qiymatlarini
-belgilang. Vite'ning `/api` proxy manzili shu sozlamalardan foydalanadi.
+Frontenddagi barcha API so'rovlari `js/config.js` orqali
+`http://127.0.0.1:5507` backendiga yuboriladi. FastAPI CORS sozlamasida Vite
+uchun `http://127.0.0.1:5173` ham ruxsat etilgan.
 
 5507-portni faqat FastAPI (`run.bat`) ishlatsin. Vite yoki Live Server'ni
 5507-portda ishga tushirmang: ular FastAPI o'rnini egallab, API va statik
@@ -103,6 +99,7 @@ GEMINI_MODEL=gemini-3.6-flash
 SESSION_SECRET=CHANGE_ME
 APP_ORIGIN=http://127.0.0.1:5507
 FRONTEND_ORIGIN=http://127.0.0.1:5507
+GOOGLE_REDIRECT_URI=http://127.0.0.1:5507/api/auth/google/callback
 ESKIZ_EMAIL=...
 ESKIZ_PASSWORD=...
 SMTP_USER=...
@@ -133,30 +130,23 @@ sozlanmagan bo'lsa demo-kod qaytarilmaydi va API aniq xato qaytaradi.
 ## 3. Google orqali kirish
 
 Google Cloud Console'da OAuth Client ID (Web application) yarating. Mahalliy
-sinov uchun Authorized redirect URI:
+sinov uchun Authorized JavaScript origins:
+
+```text
+http://127.0.0.1:5507
+http://localhost:5507
+http://127.0.0.1:5173
+```
+
+Authorized redirect URI:
 
 ```text
 http://127.0.0.1:5507/api/auth/google/callback
 ```
 
-Render'dagi Navo AI sayti uchun Authorized JavaScript origin va Authorized
-redirect URI quyidagicha bo'ladi:
-
-```text
-Authorized JavaScript origin: https://ai-agent-n9gf.onrender.com
-Authorized redirect URI:      https://ai-agent-n9gf.onrender.com/api/auth/google/callback
-```
-
 Google Console'dagi redirect URI va backend yuboradigan URI protokol, host,
 path va oxirgi slashgacha aynan bir xil bo'lishi shart. Backend `APP_ORIGIN`
-o'rnatilgan bo'lsa undan foydalanadi; Render'da `APP_ORIGIN` berilmagan bo'lsa,
-Render taqdim etadigan `RENDER_EXTERNAL_URL` dan foydalanadi. Render Environment
-bo'limida `APP_ORIGIN=https://ai-agent-n9gf.onrender.com` va quyidagi qiymatni
-aniq belgilash tavsiya qilinadi:
-
-```text
-GOOGLE_REDIRECT_URI=https://ai-agent-n9gf.onrender.com/api/auth/google/callback
-```
+o'rnatilgan bo'lsa undan foydalanadi; aks holda lokal manzil ishlatiladi.
 
 Mahalliy `.env` ichiga:
 
@@ -168,12 +158,10 @@ GOOGLE_CLIENT_SECRET=...
 GOOGLE_REDIRECT_URI=http://127.0.0.1:5507/api/auth/google/callback
 ```
 
-Deployda eski yoki boshqa domenli `GOOGLE_REDIRECT_URI` qiymati bo'lsa, uni
-yuqoridagi production URL bilan almashtiring. `.../api/auth/google/callback` va
-`.../api/auth/callback/google` Google uchun turli URI hisoblanadi; boshlash va
-token almashish birinchi URI dan foydalanadi. `FRONTEND_ORIGIN` OAuth tugagach
-foydalanuvchini frontendga qaytaradi; monolithic deployda uni ham production
-domeniga qo'ying. Google OAuth muvaffaqiyatli tugagach, Google profilingizdagi
+`.../api/auth/google/callback` va `.../api/auth/callback/google` Google uchun
+turli URI hisoblanadi; boshlash va token almashish birinchi URI dan foydalanadi.
+`FRONTEND_ORIGIN` OAuth tugagach foydalanuvchini frontendga qaytaradi.
+Google OAuth muvaffaqiyatli tugagach, Google profilingizdagi
 tasdiqlangan emailga alohida 6 xonali OTP yuboriladi. Kod 5 daqiqa amal qiladi,
 qayta yuborish tugmasi 60 soniyadan so'ng faollashadi; kod tasdiqlanmaguncha
 sessiya ochilmaydi. Shu sabab Google OTP uchun Gmail SMTP sozlamalari majburiy
