@@ -4,11 +4,12 @@ import rehypeSanitize from "rehype-sanitize";
 import remarkGfm from "remark-gfm";
 import {
   Activity, ArrowLeft, ArrowRight, AudioLines, BarChart3, Check, CheckCheck, ChevronDown,
-  CircleHelp, Clock3, Code2, Command, Copy, Download, FileArchive, FileAudio2, FileCode2,
-  FileDown, FileImage, FileSpreadsheet, FileText, ImagePlus, LayoutTemplate, Lightbulb,
-  LogIn, LogOut, Menu, MessageSquare, Mic, MicOff, MonitorSmartphone, Moon, MoreHorizontal,
-  Paperclip, PanelLeftClose, PanelLeftOpen, Pencil, Plus, Printer, RefreshCw, Search, Send,
-  Settings2, ShieldCheck, Sparkles, Square, Star, Sun, Trash2, Upload, UserRound, Volume2, X, Zap,
+  CircleHelp, Clock3, Code2, Command, Copy, Download, Eye, EyeOff, FileArchive, FileAudio2,
+  FileCode2, FileDown, FileImage, FileSpreadsheet, FileText, ImagePlus, LayoutTemplate,
+  Lightbulb, LogIn, LogOut, Menu, MessageSquare, Mic, MicOff, MonitorSmartphone, Moon,
+  MoreHorizontal, Paperclip, PanelLeftClose, PanelLeftOpen, Pencil, Plus, Printer, RefreshCw,
+  Search, Send, Settings2, ShieldCheck, Sparkles, Square, Star, Sun, Trash2, Upload,
+  UserRound, Volume2, X, Zap,
 } from "lucide-react";
 import { apiRequest, post } from "./api.js";
 import {
@@ -1013,6 +1014,7 @@ function AuthScreen({ mode, stage, busy, error, notice, demoCode, form, onMode, 
   const loginOtp = mode === "login" && stage === "login_otp";
   const verifying = stage === "code" || loginOtp;
   const [resendSeconds, setResendSeconds] = useState(0);
+  const [showPassword, setShowPassword] = useState(false);
 
   useEffect(() => {
     if (!verifying) {
@@ -1038,7 +1040,7 @@ function AuthScreen({ mode, stage, busy, error, notice, demoCode, form, onMode, 
       {!verifying && !resetting && <div className="auth-tabs"><button type="button" className={mode === "login" ? "active" : ""} onClick={() => onMode("login")}>Kirish</button><button type="button" className={mode === "register" ? "active" : ""} onClick={() => onMode("register")}>Ro‘yxatdan o‘tish</button></div>}
       <form className="auth-form" onSubmit={onSubmit}>
         {!verifying && <label className="field-label">Email yoki telefon<input required autoComplete="username" placeholder="ism@gmail.com yoki +998901234567" value={form.identity} onChange={(event) => onChange("identity", event.target.value)} /></label>}
-        {(!verifying || resetting) && <label className="field-label">{resetting ? "Yangi parol" : "Parol"}<input required minLength={8} autoComplete={resetting ? "new-password" : mode === "register" ? "new-password" : "current-password"} type="password" placeholder="Kamida 8 ta belgi" value={form.password} onChange={(event) => onChange("password", event.target.value)} /></label>}
+        {(!verifying || resetting) && <label className="field-label">{resetting ? "Yangi parol" : "Parol"}<div className="password-field"><input required minLength={8} autoComplete={resetting ? "new-password" : mode === "register" ? "new-password" : "current-password"} type={showPassword ? "text" : "password"} placeholder="Kamida 8 ta belgi" value={form.password} onChange={(event) => onChange("password", event.target.value)} /><button className="password-toggle" type="button" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? "Parolni yashirish" : "Parolni ko‘rsatish"} title={showPassword ? "Parolni yashirish" : "Parolni ko‘rsatish"}>{showPassword ? <EyeOff size={16} /> : <Eye size={16} />}</button></div></label>}
         {mode === "register" && !verifying && <label className="field-label">Ism yoki nickname<input required minLength={2} maxLength={40} autoComplete="nickname" placeholder="Masalan, Dilshod" value={form.nickname} onChange={(event) => onChange("nickname", event.target.value)} /></label>}
         {verifying && <><label className="field-label">6 xonali tasdiqlash kodi<input required autoFocus inputMode="numeric" pattern="[0-9]{6}" maxLength={6} placeholder="000000" value={form.code} onChange={(event) => onChange("code", event.target.value.replace(/\D/g, "").slice(0, 6))} /></label>{demoCode && <div className="demo-code-note">Sinov rejimidagi kodingiz: <strong>{demoCode}</strong></div>}<button className="text-action" type="button" disabled={busy || resendSeconds > 0} onClick={resendOtp}>{resendSeconds > 0 ? `Kodni qayta yuborish · ${cooldownLabel}` : "Kodni qayta yuborish"}</button></>}
         {error && <p className="auth-feedback error-feedback" role="alert"><CircleHelp size={15} />{error}</p>}{notice && <p className="auth-feedback success-feedback"><Check size={15} />{notice}</p>}

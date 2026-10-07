@@ -255,6 +255,10 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .remove-avatar:hover { color: var(--pink); }
 .field-label { display: flex; flex-direction: column; gap: 7px; color: #c5c3d0; font-size: 9px; font-weight: 600; }
 .field-label input { width: 100%; min-height: 40px; padding: 0 11px; color: var(--text); background: rgba(7,8,14,.4); border: 1px solid var(--line); border-radius: 9px; outline: none; font-size: 10px; font-weight: 400; transition: border-color .16s ease,box-shadow .16s ease; }
+.password-field { position: relative; display: flex; align-items: center; }
+.password-field input { padding-right: 38px; }
+.password-toggle { position: absolute; right: 9px; top: 50%; display: grid; width: 28px; height: 28px; place-items: center; color: var(--muted); cursor: pointer; background: rgba(255,255,255,.02); border: 1px solid transparent; border-radius: 8px; transform: translateY(-50%); transition: color .18s ease, border-color .18s ease, background .18s ease; }
+.password-toggle:hover { color: var(--text); background: rgba(255,255,255,.04); border-color: var(--line); }
 .field-label input::placeholder { color: var(--subtle); }.field-label input:focus { border-color: rgba(167,139,250,.54); box-shadow: 0 0 0 3px rgba(167,139,250,.08); }
 .field-label + .field-label { margin-top: 13px; }
 .readonly-field { display: flex; min-height: 39px; align-items: center; justify-content: space-between; padding: 0 11px; color: var(--muted); background: rgba(7,8,14,.25); border: 1px solid var(--line); border-radius: 9px; font-size: 10px; font-weight: 400; }
@@ -353,7 +357,7 @@ button:disabled { cursor: not-allowed; opacity: .55; }
   .secure-label { display: none; }
   .workspace-welcome { justify-content: flex-start; overflow-x: hidden; }
   .welcome { width: 100%; padding: 18px 14px 14px; margin: 0 auto; }.welcome h1 { margin: 12px 0 8px; font-size: clamp(29px,7.2vw,38px); line-height: 1.12; }.welcome h1 > span:first-child { display: inline; max-width: none; overflow: visible; overflow-wrap: anywhere; text-overflow: clip; vertical-align: baseline; white-space: normal; }.welcome-description { max-width: 100%; font-size: 11px; line-height: 1.6; }
-  .welcome-hero { display: flex; flex-direction: column; align-items: stretch; gap: 0; }.welcome-intro { width: 100%; }.welcome-visual { width: 100%; height: 112px; margin: 0 auto; transform: none; }.robot-caption { right: 4px; bottom: 2px; gap: 4px; padding: 5px 7px; font-size: 6px; letter-spacing: .03em; }
+  .welcome-hero { display: flex; flex-direction: column; align-items: stretch; gap: 0; }.welcome-intro { width: 100%; }.welcome-visual { width: 100%; height: 155px; margin: 0 auto; transform: none; }.robot-caption { right: 4px; bottom: 2px; gap: 4px; padding: 5px 7px; font-size: 6px; letter-spacing: .03em; }
   .welcome-badge { max-width: 100%; gap: 6px; padding: 6px 8px; font-size: 7px; letter-spacing: .08em; }
   .suggestion-grid { grid-template-columns: minmax(0,1fr); gap: 9px; margin-top: 14px; }.suggestion-item,.suggestion-card { min-height: 104px; }.suggestion-card { grid-template-columns: 30px minmax(0,1fr); grid-template-rows: auto auto; gap: 9px 11px; padding: 14px 14px 38px; }.suggestion-icon { width: 30px; height: 30px; }.suggestion-copy { grid-column: 1 / -1; font-size: 10px; line-height: 1.55; }.suggestion-more { right: 14px; bottom: 5px; left: 14px; min-height: 26px; font-size: 9px; }
   .welcome-footnote { margin-top: 12px; }
@@ -365,7 +369,7 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 @media (max-width:380px) {
   .welcome-badge { font-size: 6.5px; }.welcome h1 { font-size: 29px; }
   .welcome { padding-right: 10px; padding-left: 10px; }
-  .welcome-visual { height: 100px; }.robot-caption { display: none; }
+  .welcome-visual { height: 135px; }.robot-caption { display: none; }
   .suggestion-grid { grid-template-columns: minmax(0,1fr); gap: 8px; }.suggestion-item,.suggestion-card { min-height: 98px; }.suggestion-card { grid-template-columns: 25px minmax(0,1fr); gap: 7px 9px; padding: 12px 12px 36px; }.suggestion-icon { width: 25px; height: 25px; }.suggestion-label { font-size: 10px; }.suggestion-copy { grid-column: 1 / -1; font-size: 9px; }.suggestion-more { right: 12px; left: 12px; }.welcome-footnote { font-size: 8px; }
   .model-select { gap: 6px; }.composer-tools { gap: 3px; }.tool-button { padding: 0 6px; }.tool-button span { font-size: 8px; }
   .composer-caption { justify-content: center; }.composer-caption span:last-child { display: none; }

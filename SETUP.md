@@ -132,15 +132,33 @@ sozlanmagan bo'lsa demo-kod qaytarilmaydi va API aniq xato qaytaradi.
 
 ## 3. Google orqali kirish
 
-Google Cloud Console'da OAuth Client ID (Web application) yarating. Authorized
-redirect URI sifatida aynan quyidagini qo'shing. Bu URL Google dan qaytgan
-javobni FastAPI backendning 5507-portidagi callback handleriga jo'natadi:
+Google Cloud Console'da OAuth Client ID (Web application) yarating. Mahalliy
+sinov uchun Authorized redirect URI:
 
 ```text
 http://127.0.0.1:5507/api/auth/google/callback
 ```
 
-`.env` ichiga yozing:
+Render'dagi Navo AI sayti uchun Authorized JavaScript origin va Authorized
+redirect URI quyidagicha bo'ladi:
+
+```text
+Authorized JavaScript origin: https://ai-agent-n9gf.onrender.com
+Authorized redirect URI:      https://ai-agent-n9gf.onrender.com/api/auth/google/callback
+```
+
+Google Console'dagi redirect URI va backend yuboradigan URI protokol, host,
+path va oxirgi slashgacha aynan bir xil bo'lishi shart. Backend `APP_ORIGIN`
+o'rnatilgan bo'lsa undan foydalanadi; Render'da `APP_ORIGIN` berilmagan bo'lsa,
+Render taqdim etadigan `RENDER_EXTERNAL_URL` dan foydalanadi. Render Environment
+bo'limida `APP_ORIGIN=https://ai-agent-n9gf.onrender.com` va quyidagi qiymatni
+aniq belgilash tavsiya qilinadi:
+
+```text
+GOOGLE_REDIRECT_URI=https://ai-agent-n9gf.onrender.com/api/auth/google/callback
+```
+
+Mahalliy `.env` ichiga:
 
 ```env
 APP_ORIGIN=http://127.0.0.1:5507
@@ -150,11 +168,12 @@ GOOGLE_CLIENT_SECRET=...
 GOOGLE_REDIRECT_URI=http://127.0.0.1:5507/api/auth/google/callback
 ```
 
-Eslatma: `.../api/auth/google/callback` va `.../api/auth/callback/google` bir xil
-emas; aniq URI ni Google Console'da ham, backenddagi `GOOGLE_REDIRECT_URI` da ham
-bir xil qilib yozish kerak. `FRONTEND_ORIGIN` OAuth tugagach foydalanuvchini
-frontendga qaytaradi; deploy qilinganda uni haqiqiy frontend manziliga
-almashtiring. Google OAuth muvaffaqiyatli tugagach, Google profilingizdagi
+Deployda eski yoki boshqa domenli `GOOGLE_REDIRECT_URI` qiymati bo'lsa, uni
+yuqoridagi production URL bilan almashtiring. `.../api/auth/google/callback` va
+`.../api/auth/callback/google` Google uchun turli URI hisoblanadi; boshlash va
+token almashish birinchi URI dan foydalanadi. `FRONTEND_ORIGIN` OAuth tugagach
+foydalanuvchini frontendga qaytaradi; monolithic deployda uni ham production
+domeniga qo'ying. Google OAuth muvaffaqiyatli tugagach, Google profilingizdagi
 tasdiqlangan emailga alohida 6 xonali OTP yuboriladi. Kod 5 daqiqa amal qiladi,
 qayta yuborish tugmasi 60 soniyadan so'ng faollashadi; kod tasdiqlanmaguncha
 sessiya ochilmaydi. Shu sabab Google OTP uchun Gmail SMTP sozlamalari majburiy

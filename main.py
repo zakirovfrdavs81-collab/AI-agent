@@ -46,10 +46,15 @@ CODE_TTL = 300
 CODE_RESEND_SECONDS = 60
 MAX_CODE_ATTEMPTS = 5
 DAILY_MESSAGE_LIMIT = int(os.getenv("DAILY_MESSAGE_LIMIT", "30"))
-APP_ORIGIN = os.getenv("APP_ORIGIN", "http://127.0.0.1:5507").rstrip("/")
+APP_ORIGIN = (
+    os.getenv("APP_ORIGIN")
+    or os.getenv("RENDER_EXTERNAL_URL")
+    or "http://127.0.0.1:5507"
+).rstrip("/")
 FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", APP_ORIGIN).rstrip("/")
 GOOGLE_REDIRECT_URI = (
-    os.getenv("GOOGLE_REDIRECT_URI") or f"{APP_ORIGIN}/api/auth/google/callback"
+    os.getenv("GOOGLE_REDIRECT_URI", "").strip()
+    or f"{APP_ORIGIN}/api/auth/google/callback"
 ).rstrip("/")
 configured_jwt_secret = (os.getenv("SESSION_SECRET") or "").strip()
 if len(configured_jwt_secret) >= 32 and configured_jwt_secret != "generate-a-long-random-secret":
