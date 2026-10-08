@@ -434,7 +434,7 @@ export default function App() {
           setAuthStage("login_otp");
           setAuthNotice(result.message || `Kod ${result.email} manziliga yuborildi.`);
         } else {
-          throw new Error("Server OTP tasdiqlash bosqichini boshlamadi. Qayta urinib ko‘ring.");
+          throw new Error(result.message || "Server OTP tasdiqlash bosqichini boshlamadi. Qayta urinib ko‘ring.");
         }
       }
     } catch (error) {
@@ -462,7 +462,8 @@ export default function App() {
       setVerificationTarget(destination);
       setAuthMode("reset");
       setAuthStage("code");
-      setAuthNotice(result.message);
+      if (result.success === false) setAuthError(result.message);
+      else setAuthNotice(result.message);
       setDemoCode(result.demo_code || "");
     } catch (error) {
       setAuthError(authErrorMessage(error, "Parolni tiklash kodini yuborib bo‘lmadi. Qayta urinib ko‘ring."));
@@ -478,6 +479,10 @@ export default function App() {
     try {
       const purpose = authMode === "reset" ? "reset" : authMode === "google" ? "google" : authStage === "login_otp" ? "login" : "register";
       const result = await resendAuthOtp({ destination: verificationTarget, purpose });
+      if (result.success === false) {
+        setAuthError(result.message || "Tasdiqlash emailini yuborib bo‘lmadi.");
+        return false;
+      }
       setAuthNotice(result.message);
       setDemoCode(result.demo_code || "");
       return true;

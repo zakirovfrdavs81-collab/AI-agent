@@ -27,6 +27,7 @@ import xml.etree.ElementTree as ET
 from email.message import EmailMessage
 from email.utils import formataddr
 from pathlib import Path
+from typing import TypedDict
 
 import httpx
 import jwt
@@ -485,12 +486,13 @@ async def send_sms(phone: str, code: str):
             raise HTTPException(502, f"SMS yuborilmadi: {detail}")
 
 
-def send_email(address: str, code: str):
+def send_email(address: str, code: str) -> bool:
     host = os.getenv("SMTP_HOST")
     user = os.getenv("SMTP_USER")
     password = os.getenv("SMTP_PASSWORD")
     if not host or not user or not password:
-        raise HTTPException(503, "Email xizmati sozlanmagan. .env faylida SMTP sozlamalarini kiriting.")
+        logging.error("Email error: SMTP_HOST, SMTP_USER, or SMTP_PASSWORD is not configured")
+        return False
     port = os.getenv("SMTP_PORT", "465")
     message = EmailMessage()
     message["Subject"] = "🔐 Navo AI tasdiqlash kodi"
@@ -543,9 +545,10 @@ def send_email(address: str, code: str):
                 server.starttls(context=ssl.create_default_context())
                 server.login(user, password)
                 server.send_message(message)
-    except (OSError, smtplib.SMTPException, ValueError) as error:
-        logging.exception("Gmail SMTP delivery failed (host=%s, port=%s)", host, port)
-        raise HTTPException(502, "Tasdiqlash emailini yuborib bo‘lmadi. SMTP sozlamalarini tekshiring.") from error
+        return True
+    except Exception as error:
+        logging.error(f"Email error: {error}")
+        return False
 
 
 def drop_code(destination: str):
@@ -553,7 +556,9 @@ def drop_code(destination: str):
         connection.execute("DELETE FROM codes WHERE destination=?", (destination,))
 
 
-async def issue_code(destination: str, purpose: str, require_email: bool = False) -> str:
+async def issue_code(
+    destination: str, purpose: str, require_email: bool = False
+) -> tuple[str | None, bool]:
     """Kod yaratadi va mavjud bo'lsa real kanal orqali yuboradi.
 
     Eskiz yoki Gmail sozlanmagan bo'lsa kod demo rejimida qaytariladi, shunda
@@ -563,7 +568,8 @@ async def issue_code(destination: str, purpose: str, require_email: bool = False
     destination = normalize(destination)
     channel = "email" if require_email else channel_for(destination)
     if require_email and not all(os.getenv(name) for name in ("SMTP_HOST", "SMTP_USER", "SMTP_PASSWORD")):
-        raise HTTPException(503, "Google orqali kirish uchun SMTP email xizmati sozlanmagan.")
+        logging.error("Email error: SMTP settings are missing for required email delivery")
+        return None, False
     connection = db()
     try:
         connection.execute("DELETE FROM codes WHERE expires_at < ?", (int(time.time()),))
@@ -583,13 +589,16 @@ async def issue_code(destination: str, purpose: str, require_email: bool = False
         if channel == "sms":
             await send_sms(destination, code)
         elif channel == "email":
-            await asyncio.to_thread(send_email, destination, code)
+            email_sent = await asyncio.to_thread(send_email, destination, code)
+            if not email_sent:
+                drop_code(destination)
+                return None, False
         elif otp_mode() == "live":
             raise HTTPException(503, "Tasdiqlash kodi yuboriladigan xizmat sozlanmagan. Administrator .env faylini to‘ldirishi kerak.")
     except (HTTPException, httpx.HTTPError, OSError, smtplib.SMTPException):
         drop_code(destination)
         raise
-    return code
+    return code, True
 
 
 def check_code(destination: str, code: str, purpose: str):
@@ -734,17 +743,32 @@ async def register(payload: RegisterInput):
                     int(time.time()),
                 ),
             )
-    code = await issue_code(destination, "register")
-    channel = channel_for(destination)
-    message = (
-        f"Tasdiqlash kodi {channel_label(channel)} yuborildi."
-        if channel != "demo"
-        else "Tasdiqlash kodi yaratildi. Quyidagi kodni kiriting."
+    try:
+        code, email_sent = await issue_code(destination, "register")
+    except HTTPException as error:
+        if not is_email or error.status_code != 503:
+            raise
+        logging.error(f"Email error: {error.detail}")
+        code, email_sent = None, False
+    channel = (
+        "email"
+        if is_email and not email_sent and code is None
+        else channel_for(destination)
     )
+    if channel == "email" and not email_sent:
+        message = "Hisob yaratildi, ammo email yuborilmadi. SMTP sozlamalarini tekshiring va kodni qayta yuboring."
+    else:
+        message = (
+            f"Tasdiqlash kodi {channel_label(channel)} yuborildi."
+            if channel != "demo"
+            else "Tasdiqlash kodi yaratildi. Quyidagi kodni kiriting."
+        )
     return {
+        "success": True,
         "message": message,
         "destination": destination,
         "channel": channel,
+        "email_sent": email_sent if channel == "email" else None,
         "demo_code": code if channel == "demo" else None,
     }
 
@@ -755,44 +779,49 @@ async def verify_code(payload: CodeInput, response: Response):
     destination = normalize(payload.destination)
     identity_kind(destination)
     rate_limit(f"verify:{destination}", 20, 900)
+    google_pending: tuple[str, str | None] | None = None
     if payload.purpose == "google":
         with db() as connection:
-            pending = connection.execute(
+            pending_row = connection.execute(
                 "SELECT * FROM pending_google_auth WHERE email=? AND expires_at>?",
                 (destination, int(time.time())),
             ).fetchone()
-        if not pending:
+        if not pending_row:
             raise HTTPException(400, "Google tasdiqlash muddati tugagan. Google orqali qayta kiring.")
+        google_pending = (str(pending_row["google_sub"]), pending_row["nickname"])
     check_code(destination, payload.code, payload.purpose)
     if payload.purpose == "google":
+        if google_pending is None:
+            raise HTTPException(400, "Google tasdiqlash muddati tugagan. Google orqali qayta kiring.")
+        google_sub, google_nickname = google_pending
         with db() as connection:
             by_google = connection.execute(
-                "SELECT * FROM users WHERE google_sub=?", (pending["google_sub"],)
+                "SELECT * FROM users WHERE google_sub=?", (google_sub,)
             ).fetchone()
             by_email = connection.execute(
                 "SELECT * FROM users WHERE email=?", (destination,)
             ).fetchone()
             if by_google and by_email and by_google["id"] != by_email["id"]:
                 raise HTTPException(409, "Bu Google hisobi boshqa Navo AI hisobiga bog‘langan.")
-            if by_email and by_email["google_sub"] and by_email["google_sub"] != pending["google_sub"]:
+            if by_email and by_email["google_sub"] and by_email["google_sub"] != google_sub:
                 raise HTTPException(409, "Bu email boshqa Google hisobi bilan bog‘langan.")
             if by_google:
                 connection.execute(
                     "UPDATE users SET email=?, verified=1, nickname=COALESCE(nickname, ?) WHERE id=?",
-                    (destination, pending["nickname"], by_google["id"]),
+                    (destination, google_nickname, by_google["id"]),
                 )
                 user_id = by_google["id"]
             elif by_email:
                 connection.execute(
                     "UPDATE users SET google_sub=?, verified=1, nickname=COALESCE(nickname, ?) WHERE id=?",
-                    (pending["google_sub"], pending["nickname"], by_email["id"]),
+                    (google_sub, google_nickname, by_email["id"]),
                 )
                 user_id = by_email["id"]
             else:
                 user_id = connection.execute(
                     "INSERT INTO users(email, google_sub, verified, nickname, created_at) "
                     "VALUES (?, ?, 1, ?, ?)",
-                    (destination, pending["google_sub"], pending["nickname"], int(time.time())),
+                    (destination, google_sub, google_nickname, int(time.time())),
                 ).lastrowid
             connection.execute("DELETE FROM pending_google_auth WHERE email=?", (destination,))
             user = connection.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
@@ -842,7 +871,7 @@ async def login(payload: LoginInput, response: Response):
     if not email:
         raise HTTPException(400, "Ikki bosqichli kirish uchun akkauntingizga tasdiqlangan email bog‘langan bo‘lishi kerak.")
     try:
-        await issue_code(email, "login", require_email=True)
+        _, email_sent = await issue_code(email, "login", require_email=True)
     except HTTPException as error:
         if error.status_code != 429:
             raise
@@ -853,6 +882,13 @@ async def login(payload: LoginInput, response: Response):
             ).fetchone()
         if not active_code:
             raise
+        email_sent = True
+    if not email_sent:
+        return {
+            "require_otp": False,
+            "email_sent": False,
+            "message": "Tasdiqlash emaili yuborilmadi. Serverdagi SMTP sozlamalarini tekshiring.",
+        }
     with db() as connection:
         connection.execute(
             "INSERT OR REPLACE INTO pending_login_auth(email, user_id, expires_at) VALUES (?, ?, ?)",
@@ -906,14 +942,24 @@ async def forgot(payload: ForgotInput):
     rate_limit(
         f"forgot:{destination}", 5, 900, "Kod juda ko‘p marta so‘raldi. 15 daqiqadan so‘ng qayta urinib ko‘ring."
     )
-    code = await issue_code(destination, "reset")
+    code, email_sent = await issue_code(destination, "reset")
     channel = channel_for(destination)
+    if channel == "email" and not email_sent:
+        return {
+            "success": False,
+            "message": "Tiklash kodi emailga yuborilmadi. Serverdagi SMTP sozlamalarini tekshiring.",
+            "destination": destination,
+            "channel": channel,
+            "email_sent": False,
+            "demo_code": None,
+        }
     return {
         "message": f"Parolni tiklash kodi {channel_label(channel)} yuborildi."
         if channel != "demo"
         else "Tiklash kodi yaratildi. Quyidagi kodni kiriting.",
         "destination": destination,
         "channel": channel,
+        "email_sent": email_sent if channel == "email" else None,
         "demo_code": code if channel == "demo" else None,
     }
 
@@ -955,8 +1001,19 @@ async def resend(payload: ResendInput):
     rate_limit(
         f"resend:{destination}", 5, 900, "Kod juda ko‘p marta so‘raldi. 15 daqiqadan so‘ng qayta urinib ko‘ring."
     )
-    code = await issue_code(destination, purpose, require_email=purpose in {"google", "login"})
+    code, email_sent = await issue_code(
+        destination, purpose, require_email=purpose in {"google", "login"}
+    )
     channel = "email" if purpose in {"google", "login"} else channel_for(destination)
+    if channel == "email" and not email_sent:
+        return {
+            "success": False,
+            "message": "Tasdiqlash emaili yuborilmadi. Serverdagi SMTP sozlamalarini tekshiring.",
+            "destination": destination,
+            "channel": channel,
+            "email_sent": False,
+            "demo_code": None,
+        }
     if purpose == "google":
         with db() as connection:
             connection.execute(
@@ -975,6 +1032,7 @@ async def resend(payload: ResendInput):
         else "Yangi kod yaratildi. Quyidagi kodni kiriting.",
         "destination": destination,
         "channel": channel,
+        "email_sent": email_sent if channel == "email" else None,
         "demo_code": code if channel == "demo" else None,
     }
 
@@ -1075,7 +1133,7 @@ async def google_callback(request: Request, code: str = "", state: str = ""):
             (email, google_sub, google_nickname, int(time.time()) + CODE_TTL * 2),
         )
     try:
-        await issue_code(email, "google", require_email=True)
+        _, email_sent = await issue_code(email, "google", require_email=True)
     except HTTPException as error:
         if error.status_code == 429:
             with db() as connection:
@@ -1091,6 +1149,10 @@ async def google_callback(request: Request, code: str = "", state: str = ""):
         logging.warning("Google email OTP could not be issued: %s", error.detail)
         error_code = "google_otp_setup" if error.status_code == 503 else "google_otp_failed"
         return RedirectResponse(f"{FRONTEND_ORIGIN}/?auth_error={error_code}")
+    if not email_sent:
+        with db() as connection:
+            connection.execute("DELETE FROM pending_google_auth WHERE email=?", (email,))
+        return RedirectResponse(f"{FRONTEND_ORIGIN}/?auth_error=google_otp_failed")
     query = httpx.QueryParams({"auth_step": "google_otp", "destination": email})
     return RedirectResponse(f"{FRONTEND_ORIGIN}/?{query}")
 
@@ -1378,7 +1440,15 @@ PREFERRED_MODELS = (
     "gemini-pro-latest",
 )
 MODEL_CACHE_SECONDS = 900
-_model_probe: dict[str, object] = {"name": "", "checked": 0.0, "candidates": []}
+
+
+class ModelProbe(TypedDict):
+    name: str
+    checked: float
+    candidates: list[str]
+
+
+_model_probe: ModelProbe = {"name": "", "checked": 0.0, "candidates": []}
 
 
 def configured_model() -> str:
@@ -1424,7 +1494,7 @@ async def model_queue_for(client: httpx.AsyncClient, key: str) -> list[str]:
     """Ishlagan model 15 daqiqa eslab qolinadi, aks holda ro'yxat qayta aniqlanadi."""
     cached = str(_model_probe.get("name") or "")
     if cached and time.time() - float(_model_probe.get("checked") or 0.0) < MODEL_CACHE_SECONDS:
-        candidates = _model_probe.get("candidates") or []
+        candidates = _model_probe["candidates"]
         return [cached, *(name for name in candidates if name != cached)][:6]
     live = await live_models(client, key)
     queue = model_queue(live)
@@ -1571,18 +1641,21 @@ async def chat(payload: ChatInput, session: str | None = Cookie(default=None)):
     stamp = int(time.time())
     with db() as connection:
         conversation_id = payload.conversation_id
-        if not conversation_id:
+        if conversation_id is None:
             first_line = next((line.strip() for line in payload.prompt.splitlines() if line.strip()), "")
-            conversation_id = connection.execute(
+            created_conversation_id = connection.execute(
                 "INSERT INTO conversations (user_id, title, created_at, updated_at) VALUES (?, ?, ?, ?)",
                 (user["id"], first_line[:72] or "Yangi suhbat", stamp, stamp),
             ).lastrowid
+            if created_conversation_id is None:
+                raise HTTPException(500, "Suhbat yaratilmadi. Qayta urinib ko‘ring.")
+            conversation_id = created_conversation_id
         save_message(connection, conversation_id, "user", payload.prompt, file_names)
         save_message(connection, conversation_id, "assistant", answer)
     add_usage(user["id"])
     return {
         "text": answer,
-        "conversation_id": int(conversation_id),
+        "conversation_id": conversation_id,
         "used_today": usage_today(user["id"]),
         "daily_limit": DAILY_MESSAGE_LIMIT,
         "notes": notes,
