@@ -175,3 +175,40 @@ Uni yaratish uchun terminalda `python -c "import secrets; print(secrets.token_ur
 buyrug'ini ishlating. Qisqa yoki namuna qiymat bilan backend vaqtinchalik JWT
 kalitidan foydalanadi, server qayta ishga tushganda sessiyalar yangidan kirishni
 talab qiladi.
+
+## 4. Vercel frontend va FastAPI CORS
+
+Render backendida `FRONTEND_ORIGIN` muhit o'zgaruvchisini
+`https://ai-agent-firdavs25.vercel.app` qiymatiga sozlang. CORS middleware
+Vercel origini bilan birga localhost 5507 originlarini ham ruxsat etadi.
+`Origin` sarlavhasi bo'lmagan so'rovlar CORS tekshiruvini talab qilmaydi. `*` origin
+credential cookie'lari bilan xavfsiz ishlatilmaydi, shuning uchun wildcard
+allowlistga qo'shilmaydi; haqiqiy frontend domenini aniq yozing.
+
+Vercel loyihasida **Settings -> Environment Variables** bo'limida quyidagini
+qo'shing va keyin yangi deploy bajaring:
+
+```text
+VITE_API_URL=https://ai-agent-1-d569.onrender.com
+```
+
+Frontenddagi API so'rovlari shu URL ostidagi `/api/...` yo'llariga boradi.
+Vercel frontend fayllari (`/assets/*.js`, `/assets/*.css`, logotiplar) Vercel
+domenidan yuklanadi; ular backend API URL'iga yuborilmasligi kerak. Backendning
+statik yo'llari lokal monolit ishga tushirish uchun qoladi; Vercel build
+aktivlariga xizmat qilmaydi. Mahalliy `npm run dev` `VITE_API_URL` belgilanmaganida
+`http://127.0.0.1:5507` backendidan foydalanadi.
+
+Render backend Environment Variables bo'limida quyidagilarni belgilang:
+
+```text
+APP_ORIGIN=https://ai-agent-1-d569.onrender.com
+FRONTEND_ORIGIN=https://ai-agent-firdavs25.vercel.app
+GOOGLE_REDIRECT_URI=https://ai-agent-1-d569.onrender.com/api/auth/google/callback
+```
+
+`APP_ORIGIN` HTTPS bo'lishi Render'dagi secure session cookie'ni yoqadi.
+Vercel va Render originlari turli domenlarda bo'lgani uchun sessiya cookie'si
+`SameSite=None; Secure` bilan yuboriladi. Google OAuth ishlatilsa, Google Cloud
+Console'da yuqoridagi Render callback manzilini ham Authorized redirect URI
+sifatida qo'shing.

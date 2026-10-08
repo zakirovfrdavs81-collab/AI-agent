@@ -20,6 +20,7 @@ if not exist "node_modules" (
     if errorlevel 1 goto :build_failed
 )
 echo Frontend yig'ilmoqda...
+set "VITE_API_URL=http://127.0.0.1:5507"
 call npm run build
 if errorlevel 1 goto :build_failed
 if not exist "dist\index.html" goto :dist_missing

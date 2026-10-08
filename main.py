@@ -50,7 +50,12 @@ APP_ORIGIN = (
     os.getenv("APP_ORIGIN")
     or "http://127.0.0.1:5507"
 ).rstrip("/")
-FRONTEND_ORIGIN = os.getenv("FRONTEND_ORIGIN", APP_ORIGIN).rstrip("/")
+configured_frontend_origin = (os.getenv("FRONTEND_ORIGIN") or "").strip().rstrip("/")
+FRONTEND_ORIGIN = (
+    configured_frontend_origin
+    if configured_frontend_origin and configured_frontend_origin != "*"
+    else APP_ORIGIN
+)
 GOOGLE_REDIRECT_URI = (
     os.getenv("GOOGLE_REDIRECT_URI", "").strip()
     or f"{APP_ORIGIN}/api/auth/google/callback"
@@ -67,11 +72,12 @@ else:
 password_hash = PasswordHash.recommended()
 app = FastAPI(title="Gemini Chat")
 cors_origins = {
-    APP_ORIGIN,
-    FRONTEND_ORIGIN,
+    "https://ai-agent-firdavs25.vercel.app",
     "http://127.0.0.1:5507",
     "http://localhost:5507",
 }
+if FRONTEND_ORIGIN != "*":
+    cors_origins.add(FRONTEND_ORIGIN)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=sorted(cors_origins),
@@ -402,12 +408,13 @@ def create_session(user_id: int) -> str:
 
 def start_session(response: Response, user_id: int):
     token = create_session(user_id)
+    secure_cookie = APP_ORIGIN.startswith("https://")
     response.set_cookie(
         "session",
         token,
         httponly=True,
-        secure=APP_ORIGIN.startswith("https://"),
-        samesite="lax",
+        secure=secure_cookie,
+        samesite="none" if secure_cookie and FRONTEND_ORIGIN != APP_ORIGIN else "lax",
         max_age=60 * 60 * 24 * SESSION_DAYS,
         path="/",
     )
