@@ -20,6 +20,7 @@ import re
 import secrets
 import smtplib
 import sqlite3
+import ssl
 import time
 import zipfile
 import xml.etree.ElementTree as ET
@@ -86,6 +87,13 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+@app.get("/api/health")
+async def health():
+    return {"status": "ok"}
+
+
 app.mount("/css", StaticFiles(directory=ROOT / "css"), name="css")
 app.mount("/js", StaticFiles(directory=ROOT / "js"), name="js")
 if (ROOT / "dist" / "assets").is_dir():
@@ -483,6 +491,7 @@ def send_email(address: str, code: str):
     password = os.getenv("SMTP_PASSWORD")
     if not host or not user or not password:
         raise HTTPException(503, "Email xizmati sozlanmagan. .env faylida SMTP sozlamalarini kiriting.")
+    port = os.getenv("SMTP_PORT", "465")
     message = EmailMessage()
     message["Subject"] = "🔐 Navo AI tasdiqlash kodi"
     message["From"] = formataddr(("Navo AI", user))
@@ -522,11 +531,20 @@ def send_email(address: str, code: str):
         subtype="html",
     )
     try:
-        with smtplib.SMTP(host, int(os.getenv("SMTP_PORT", "587")), timeout=20) as server:
-            server.starttls()
-            server.login(user, password)
-            server.send_message(message)
-    except (OSError, smtplib.SMTPException) as error:
+        port = int(port)
+        if port == 465:
+            with smtplib.SMTP_SSL(
+                host, port, timeout=20, context=ssl.create_default_context()
+            ) as server:
+                server.login(user, password)
+                server.send_message(message)
+        else:
+            with smtplib.SMTP(host, port, timeout=20) as server:
+                server.starttls(context=ssl.create_default_context())
+                server.login(user, password)
+                server.send_message(message)
+    except (OSError, smtplib.SMTPException, ValueError) as error:
+        logging.exception("Gmail SMTP delivery failed (host=%s, port=%s)", host, port)
         raise HTTPException(502, "Tasdiqlash emailini yuborib bo‘lmadi. SMTP sozlamalarini tekshiring.") from error
 
 

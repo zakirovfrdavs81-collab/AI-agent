@@ -112,10 +112,13 @@ OTP_MODE=live
 
 Telefon OTP uchun Eskiz akkaunti va SMS balansi kerak. Haqiqiy email OTP uchun
 Gmail App Password yarating, `.env` ichida `SMTP_HOST=smtp.gmail.com`,
-`SMTP_PORT=587`, Gmail manzili va App Password qiymatlarini to'ldiring va
+`SMTP_PORT=465`, Gmail manzili va App Password qiymatlarini to'ldiring va
 `DEV_SHOW_OTP=false` qoldiring. Email `Navo AI` nomidan `🔐 Navo AI tasdiqlash
 kodi` mavzusi bilan HTML va oddiy matn ko'rinishida yuboriladi. Kod 6 xonali,
 5 daqiqa amal qiladi; qayta yuborish orasida 60 soniya kutish bor.
+Port 465 implicit SSL (`SMTP_SSL`) bilan ishlatiladi; boshqa SMTP portlarda
+backend STARTTLS yoqadi. Render loglarida SMTP serveridan kelgan haqiqiy xato
+matni traceback bilan yoziladi.
 
 Gemini modeli javob bermasa yoki sekinlashsa, backend sozlangan modelni
 birinchi bo'lib sinab, keyin API kalitiga mos mavjud zaxira modellarni tekshiradi.
@@ -212,3 +215,6 @@ Vercel va Render originlari turli domenlarda bo'lgani uchun sessiya cookie'si
 `SameSite=None; Secure` bilan yuboriladi. Google OAuth ishlatilsa, Google Cloud
 Console'da yuqoridagi Render callback manzilini ham Authorized redirect URI
 sifatida qo'shing.
+
+Backendni tez tekshirish uchun `GET /api/health` endpointi
+`{"status":"ok"}` javobini qaytaradi.
