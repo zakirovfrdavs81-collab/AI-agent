@@ -9,6 +9,9 @@
     "watch": "vite build --watch",
     "preview": "vite preview --host 127.0.0.1"
   },
+  "allowScripts": {
+    "esbuild": true
+  },
   "dependencies": {
     "lucide-react": "^0.468.0",
     "react": "^19.0.0",
