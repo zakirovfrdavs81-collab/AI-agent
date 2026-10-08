@@ -1,8 +1,8 @@
 # Navo AI'ni ishga tushirish
 
-Loyiha uch qismdan iborat: **FastAPI backend** (`main.py`), **Vite + React
-frontend** (`src/`, `index.html`) va **premium taqdimot sahifasi**
-(`showcase/` — HTML + Tailwind + GSAP + Lenis + Three.js).
+Loyiha endi clean monorepo tuzilishga ega: **FastAPI backend** (`backend/`),
+**Vite + React frontend** (`frontend/`) va **premium taqdimot sahifasi**
+(`frontend/showcase/` — HTML + Tailwind + GSAP + Lenis + Three.js).
 
 Bu paketda maxfiy kalitlar yo'q. Mijoz `.env.example` nusxasini `.env` qilib,
 o'zining Gemini, SMS va Google credentiallarini kiritadi. `.env` faylini ZIP
@@ -19,7 +19,7 @@ Sayt faqat shu manzildan ochiladi:
 <http://127.0.0.1:5507>
 
 Login, SMS, Google OAuth va Gemini so'rovlari faqat shu serverda ishlaydi:
-maxfiy kalitlar shu yerda saqlanadi. `src/` ichidagi o'zgarishlarni yig'ib
+maxfiy kalitlar shu yerda saqlanadi. `frontend/src/` ichidagi o'zgarishlarni yig'ib
 5507-portda ko'rish uchun `run.bat` ni qayta ishga tushiring.
 
 ## 1a. Development — React + FastAPI
@@ -49,7 +49,7 @@ zarrachali fon, magnit tugmalar, 3D tilt kartalar va drag galereya.
 http://127.0.0.1:5507/showcase/
 ```
 
-Sahifa FastAPI statik mount orqali uzatiladi (`main.py` → `app.mount("/showcase")`),
+Sahifa FastAPI statik mount orqali uzatiladi (`backend/main.py` → `app.mount("/showcase")`),
 shuning uchun alohida server kerak emas. Barcha kutubxonalar `showcase/vendor/`
 ichida lokal saqlanadi (internet talab qilinmaydi), shriftlar Google Fonts'dan
 yuklanadi.
@@ -172,14 +172,14 @@ Loyiha Render'da bitta **Python Web Service** sifatida ishlaydi. Render blueprin
 `render.yaml` ichida quyidagi buyruqlar allaqachon sozlangan:
 
 ```text
-Build: npm install && pip install -r requirements.txt && npm run build
+Build: npm install && pip install -r backend/requirements.txt && npm run build
 Start: npm start
 ```
 
 GitHub repository'ni Render Blueprint yoki Web Service orqali deploy qiling.
-Build React frontendni `dist/` ichiga yig'adi; `npm start` esa `process.env.PORT`
+Build React frontendni `frontend/dist/` ichiga yig'adi; `npm start` esa `process.env.PORT`
 ni `0.0.0.0` manzilida tinglaydigan FastAPI serverini ishga tushiradi. FastAPI
-`dist/` fayllarini va `/api/...` marshrutlarini bitta origin'dan beradi.
+`frontend/dist/` fayllarini va `/api/...` marshrutlarini bitta origin'dan beradi.
 Frontend API so'rovlari nisbiy `/api/...` yo'llardan foydalanadi. Vercel'da
 alohida frontend deploy qilish yoki `VITE_API_URL` o'rnatish shart emas.
 

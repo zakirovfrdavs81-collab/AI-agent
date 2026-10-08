@@ -39,10 +39,13 @@ from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from pwdlib import PasswordHash
 
-load_dotenv()
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+BACKEND_ROOT = Path(__file__).resolve().parent
+FRONTEND_ROOT = PROJECT_ROOT / "frontend"
+ROOT = PROJECT_ROOT
+load_dotenv(PROJECT_ROOT / ".env")
 
-ROOT = Path(__file__).parent
-DB = Path(os.getenv("NAVO_DB_PATH", ROOT / "app.db"))
+DB = Path(os.getenv("NAVO_DB_PATH", str(BACKEND_ROOT / "app.db")))
 SESSION_DAYS = 30
 CODE_TTL = 300
 CODE_RESEND_SECONDS = 60
@@ -51,7 +54,7 @@ DAILY_MESSAGE_LIMIT = int(os.getenv("DAILY_MESSAGE_LIMIT", "30"))
 APP_ORIGIN = (
     os.getenv("APP_ORIGIN")
     or os.getenv("RENDER_EXTERNAL_URL")
-    or "http://127.0.0.1:5507"
+    or f"http://127.0.0.1:{os.getenv('PORT', '5507')}"
 ).rstrip("/")
 configured_frontend_origin = (os.getenv("FRONTEND_ORIGIN") or "").strip().rstrip("/")
 FRONTEND_ORIGIN = (
@@ -84,7 +87,7 @@ if FRONTEND_ORIGIN not in {"*", APP_ORIGIN}:
 app.add_middleware(
     CORSMiddleware,
     allow_origins=sorted(cors_origins),
-    allow_origin_regex=r"http://(127\.0\.0\.1|localhost):(5173|5507)",
+    allow_origin_regex=r"http://(127\.0\.0\.1|localhost):5507",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -96,12 +99,12 @@ async def health():
     return {"status": "ok"}
 
 
-app.mount("/css", StaticFiles(directory=ROOT / "css"), name="css")
-app.mount("/js", StaticFiles(directory=ROOT / "js"), name="js")
-if (ROOT / "dist" / "assets").is_dir():
-    app.mount("/assets", StaticFiles(directory=ROOT / "dist" / "assets"), name="assets")
+app.mount("/css", StaticFiles(directory=FRONTEND_ROOT / "css"), name="css")
+app.mount("/js", StaticFiles(directory=FRONTEND_ROOT / "js"), name="js")
+if (FRONTEND_ROOT / "dist" / "assets").is_dir():
+    app.mount("/assets", StaticFiles(directory=FRONTEND_ROOT / "dist" / "assets"), name="assets")
 
-DIST = ROOT / "dist"
+DIST = FRONTEND_ROOT / "dist"
 DIST_MEDIA_TYPES = {
     ".svg": "image/svg+xml",
     ".png": "image/png",
@@ -128,7 +131,7 @@ async def dist_root_file(request: Request):
     return FileResponse(target, media_type=DIST_MEDIA_TYPES.get(target.suffix, "application/octet-stream"))
 
 
-SHOWCASE = ROOT / "showcase"
+SHOWCASE = FRONTEND_ROOT / "showcase"
 if (SHOWCASE / "index.html").is_file():
     # Taqdimot sahifasi: /showcase/ (statik, ilova API lariga ta'sir qilmaydi)
     app.mount("/showcase", StaticFiles(directory=SHOWCASE, html=True), name="showcase")
@@ -643,7 +646,7 @@ def frontend_page() -> Path:
     Vite (5173) yoki build (dist) ochib bera oladi. Shu sababli uni to'g'ridan
     to'g'ri uzatish oq (bo'sh) sahifaga olib keladi.
     """
-    for candidate in (ROOT / "dist" / "index.html", ROOT / "legacy.html", ROOT / "index.html"):
+    for candidate in (FRONTEND_ROOT / "dist" / "index.html", FRONTEND_ROOT / "legacy.html", FRONTEND_ROOT / "index.html"):
         if candidate.is_file():
             return candidate
     raise HTTPException(status_code=404, detail="Frontend topilmadi. `npm run build` ni bajarib, serverni qayta ishga tushiring.")
@@ -656,14 +659,14 @@ async def index():
 
 @app.get("/manifest.webmanifest")
 async def manifest():
-    return FileResponse(ROOT / "manifest.webmanifest", media_type="application/manifest+json")
+    return FileResponse(FRONTEND_ROOT / "manifest.webmanifest", media_type="application/manifest+json")
 
 
 @app.get("/sw.js")
 async def service_worker():
-    worker = ROOT / "sw.js"
+    worker = FRONTEND_ROOT / "sw.js"
     if not worker.is_file():
-        worker = ROOT / "js" / "sw.js"
+        worker = FRONTEND_ROOT / "js" / "sw.js"
     if not worker.is_file():
         raise HTTPException(status_code=404, detail="Service worker fayli topilmadi.")
     return FileResponse(worker, media_type="application/javascript")

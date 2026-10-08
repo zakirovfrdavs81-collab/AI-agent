@@ -5,13 +5,13 @@ if not exist ".venv\Scripts\python.exe" (
     py -m venv .venv
     if errorlevel 1 goto :setup_failed
     call ".venv\Scripts\activate.bat"
-    python -m pip install -r requirements.txt
+    python -m pip install -r backend\requirements.txt
     if errorlevel 1 goto :setup_failed
 ) else (
     call ".venv\Scripts\activate.bat"
 )
 if not exist ".env" copy ".env.example" ".env" >nul
-rem 5507-port FastAPI uchun: dist frontend va API shu serverdan uzatiladi.
+rem 5507-port FastAPI uchun: frontend/dist frontend va API shu serverdan uzatiladi.
 where npm >nul 2>nul
 if errorlevel 1 goto :npm_missing
 if not exist "node_modules" (
@@ -22,8 +22,8 @@ if not exist "node_modules" (
 echo Frontend yig'ilmoqda...
 call npm run build
 if errorlevel 1 goto :build_failed
-if not exist "dist\index.html" goto :dist_missing
-if not exist "dist\assets" goto :dist_missing
+if not exist "frontend\dist\index.html" goto :dist_missing
+if not exist "frontend\dist\assets" goto :dist_missing
 echo.
 echo Sayt manzili:       http://127.0.0.1:5507
 echo Taqdimot sahifasi:  http://127.0.0.1:5507/showcase/
@@ -45,7 +45,7 @@ pause
 exit /b 1
 
 :dist_missing
-echo XATO: dist\index.html yoki dist\assets topilmadi. Build natijasi to'liq emas.
+echo XATO: frontend\dist\index.html yoki frontend\dist\assets topilmadi. Build natijasi to'liq emas.
 pause
 exit /b 1
 

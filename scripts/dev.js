@@ -1,52 +1,48 @@
 import { spawn } from "node:child_process";
-import { existsSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
-const viteEntry = path.join(projectRoot, "node_modules", "vite", "bin", "vite.js");
-if (!existsSync(viteEntry)) {
-  console.error("Vite is not installed. Run npm install before npm run dev.");
-  process.exit(1);
-}
+const shellCommand = process.platform === "win32" ? "cmd" : "sh";
+const shellArgs = process.platform === "win32" ? ["/c", "npm run build"] : ["-lc", "npm run build"];
 
-const children = [
-  spawn(process.execPath, [path.join(projectRoot, "scripts", "start.js")], {
-    cwd: projectRoot,
-    env: { ...process.env, HOST: "127.0.0.1", PORT: "5507" },
-    stdio: "inherit",
-  }),
-  spawn(process.execPath, [viteEntry, "--host", "127.0.0.1"], {
+function runBuildAndStart() {
+  const build = spawn(shellCommand, shellArgs, {
     cwd: projectRoot,
     env: process.env,
     stdio: "inherit",
-  }),
-];
-
-let stopping = false;
-
-function stopChildren(signal = "SIGTERM") {
-  if (stopping) return;
-  stopping = true;
-  for (const child of children) {
-    if (child.exitCode === null && child.signalCode === null) child.kill(signal);
-  }
-}
-
-for (const child of children) {
-  child.on("error", (error) => {
-    console.error(`Development process failed to start: ${error.message}`);
-    process.exitCode = 1;
-    stopChildren();
   });
-  child.on("exit", (code, signal) => {
-    if (!stopping) {
-      process.exitCode = code ?? (signal ? 1 : 0);
-      stopChildren();
+
+  build.on("error", (error) => {
+    console.error(`Build failed to start: ${error.message}`);
+    process.exit(1);
+  });
+
+  build.on("exit", (code) => {
+    if (code !== 0) {
+      process.exit(code ?? 1);
+      return;
+    }
+
+    const backend = spawn(process.execPath, [path.join(projectRoot, "scripts", "start.js")], {
+      cwd: projectRoot,
+      env: { ...process.env, HOST: "127.0.0.1", PORT: "5507" },
+      stdio: "inherit",
+    });
+
+    backend.on("error", (error) => {
+      console.error(`Backend failed to start: ${error.message}`);
+      process.exit(1);
+    });
+
+    backend.on("exit", (exitCode, signal) => {
+      process.exit(exitCode ?? (signal ? 1 : 0));
+    });
+
+    for (const signal of ["SIGINT", "SIGTERM"]) {
+      process.on(signal, () => backend.kill(signal));
     }
   });
 }
 
-for (const signal of ["SIGINT", "SIGTERM"]) {
-  process.on(signal, () => stopChildren(signal));
-}
+runBuildAndStart();

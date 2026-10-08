@@ -2,8 +2,10 @@ services:
   - type: web
     name: ai-agent-backend
     runtime: python
-    buildCommand: npm install && pip install -r requirements.txt && npm run build
+    buildCommand: npm install && pip install -r backend/requirements.txt && npm run build
     startCommand: npm start
     envVars:
       - key: PYTHON_VERSION
         value: "3.11"
+      - key: NAVO_DB_PATH
+        value: backend/app.db
