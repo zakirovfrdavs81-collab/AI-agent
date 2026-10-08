@@ -4,10 +4,12 @@
   "version": "1.0.0",
   "type": "module",
   "scripts": {
-    "dev": "vite --host 127.0.0.1",
+    "dev": "node scripts/dev.js",
+    "dev:frontend": "vite --host 127.0.0.1",
     "build": "vite build",
     "watch": "vite build --watch",
-    "preview": "vite preview --host 127.0.0.1"
+    "preview": "vite preview --host 127.0.0.1",
+    "start": "node scripts/start.js"
   },
   "allowScripts": {
     "esbuild": true

@@ -2,8 +2,8 @@ services:
   - type: web
     name: ai-agent-backend
     runtime: python
-    buildCommand: npm install && npm run build && pip install -r requirements.txt
-    startCommand: uvicorn main:app --host 0.0.0.0 --port $PORT
+    buildCommand: npm install && pip install -r requirements.txt && npm run build
+    startCommand: npm start
     envVars:
       - key: PYTHON_VERSION
         value: "3.11"

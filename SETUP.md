@@ -22,36 +22,22 @@ Login, SMS, Google OAuth va Gemini so'rovlari faqat shu serverda ishlaydi:
 maxfiy kalitlar shu yerda saqlanadi. `src/` ichidagi o'zgarishlarni yig'ib
 5507-portda ko'rish uchun `run.bat` ni qayta ishga tushiring.
 
-## 1a. Frontend ustida ishlash — Vite (5173, hot reload)
+## 1a. Development — React + FastAPI
 
 ```text
 npm install
+python -m pip install -r requirements.txt
 npm run dev
 ```
 
-Vite 5173-portda ishga tushadi: <http://127.0.0.1:5173>. Bu manzilda JSX
-brauzer uchun avtomatik o'giriladi va har o'zgarish darhol ko'rinadi. Frontend
-API so'rovlari lokal FastAPI'ning 5507-portiga yuboriladi. VS Code Live Server
-esa yig'ilgan `dist` frontendni 5507-portda ochadi.
+`npm run dev` FastAPI'ni `http://127.0.0.1:5507` va Vite'ni
+`http://127.0.0.1:5173` manzillarida birgalikda ishga tushiradi. Vite `/api`
+so'rovlarini FastAPI'ga proxy qiladi; development frontend va backend orasida
+alohida CORS yoki API URL sozlamasi kerak emas.
 
-Frontenddagi barcha API so'rovlari `js/config.js` orqali
-`http://127.0.0.1:5507` backendiga yuboriladi. FastAPI CORS sozlamasida Vite
-uchun `http://127.0.0.1:5173` ham ruxsat etilgan.
-
-5507-portni faqat FastAPI (`run.bat`) ishlatsin. Vite yoki Live Server'ni
-5507-portda ishga tushirmang: ular FastAPI o'rnini egallab, API va statik
-fayllar noto'g'ri manzildan kelishiga yoki oq sahifaga sabab bo'lishi mumkin.
-VS Code pastidagi `5507` port havolasi saytni ochadi, lekin serverni o'zi
-ishga tushirmaydi — avval terminalda `Uvicorn running on
-http://127.0.0.1:5507` xabari chiqishi kerak.
-
-## 1b. VS Code Live Server
-
-Live Server frontendni `dist` papkasidan `http://127.0.0.1:5507` manzilida
-ochadi. Backend uchun `run.bat` orqali 5507-portni ishga tushiring; frontend
-API'ga CORS bilan ulanadi. `APP_ORIGIN=http://127.0.0.1:5507` va
-`FRONTEND_ORIGIN=http://127.0.0.1:5507` bo'lishi kerak. O'zgartirilgan React
-kodini Live Server'da ko'rishdan oldin `npm run build` bajaring.
+`npm start` yig'ilgan frontend va API'ni `http://127.0.0.1:5507` da bitta
+serverdan uzatadi. 5507-portda FastAPI ishlaganda VS Code Live Server/Go Live'ni
+yoqmang; frontend ustida ishlash uchun `npm run dev` dan foydalaning.
 
 ## 1c. Premium taqdimot sahifasi — `/showcase/`
 
@@ -105,7 +91,7 @@ ESKIZ_PASSWORD=...
 SMTP_USER=...
 SMTP_PASSWORD=...
 SMTP_HOST=smtp.gmail.com
-SMTP_PORT=587
+SMTP_PORT=465
 DEV_SHOW_OTP=false
 OTP_MODE=live
 ```
@@ -148,8 +134,9 @@ http://127.0.0.1:5507/api/auth/google/callback
 ```
 
 Google Console'dagi redirect URI va backend yuboradigan URI protokol, host,
-path va oxirgi slashgacha aynan bir xil bo'lishi shart. Backend `APP_ORIGIN`
-o'rnatilgan bo'lsa undan foydalanadi; aks holda lokal manzil ishlatiladi.
+path va oxirgi slashgacha aynan bir xil bo'lishi shart. Backend `APP_ORIGIN`,
+keyin Render bergan `RENDER_EXTERNAL_URL` dan foydalanadi; ulardan hech biri
+bo'lmasa lokal manzil ishlatiladi.
 
 Mahalliy `.env` ichiga:
 
@@ -179,42 +166,46 @@ buyrug'ini ishlating. Qisqa yoki namuna qiymat bilan backend vaqtinchalik JWT
 kalitidan foydalanadi, server qayta ishga tushganda sessiyalar yangidan kirishni
 talab qiladi.
 
-## 4. Vercel frontend va FastAPI CORS
+## 4. Bitta serverga deploy — Render
 
-Render backendida `FRONTEND_ORIGIN` muhit o'zgaruvchisini
-`https://ai-agent-firdavs25.vercel.app` qiymatiga sozlang. CORS middleware
-Vercel origini bilan birga localhost 5507 originlarini ham ruxsat etadi.
-`Origin` sarlavhasi bo'lmagan so'rovlar CORS tekshiruvini talab qilmaydi. `*` origin
-credential cookie'lari bilan xavfsiz ishlatilmaydi, shuning uchun wildcard
-allowlistga qo'shilmaydi; haqiqiy frontend domenini aniq yozing.
-
-Vercel loyihasida **Settings -> Environment Variables** bo'limida quyidagini
-qo'shing va keyin yangi deploy bajaring:
+Loyiha Render'da bitta **Python Web Service** sifatida ishlaydi. Render blueprint
+`render.yaml` ichida quyidagi buyruqlar allaqachon sozlangan:
 
 ```text
-VITE_API_URL=https://ai-agent-1-d569.onrender.com
+Build: npm install && pip install -r requirements.txt && npm run build
+Start: npm start
 ```
 
-Frontenddagi API so'rovlari shu URL ostidagi `/api/...` yo'llariga boradi.
-Vercel frontend fayllari (`/assets/*.js`, `/assets/*.css`, logotiplar) Vercel
-domenidan yuklanadi; ular backend API URL'iga yuborilmasligi kerak. Backendning
-statik yo'llari lokal monolit ishga tushirish uchun qoladi; Vercel build
-aktivlariga xizmat qilmaydi. Mahalliy `npm run dev` `VITE_API_URL` belgilanmaganida
-`http://127.0.0.1:5507` backendidan foydalanadi.
+GitHub repository'ni Render Blueprint yoki Web Service orqali deploy qiling.
+Build React frontendni `dist/` ichiga yig'adi; `npm start` esa `process.env.PORT`
+ni `0.0.0.0` manzilida tinglaydigan FastAPI serverini ishga tushiradi. FastAPI
+`dist/` fayllarini va `/api/...` marshrutlarini bitta origin'dan beradi.
+Frontend API so'rovlari nisbiy `/api/...` yo'llardan foydalanadi. Vercel'da
+alohida frontend deploy qilish yoki `VITE_API_URL` o'rnatish shart emas.
 
-Render backend Environment Variables bo'limida quyidagilarni belgilang:
+Render'da maxfiy backend sozlamalarini **Environment Variables** bo'limida
+kiriting: `GEMINI_API_KEY`, `SESSION_SECRET`, `SMTP_HOST`, `SMTP_PORT`,
+`SMTP_USER`, `SMTP_PASSWORD`; Google login uchun `GOOGLE_CLIENT_ID` va
+`GOOGLE_CLIENT_SECRET`; SMS uchun `ESKIZ_EMAIL` va `ESKIZ_PASSWORD`.
+`APP_ORIGIN` bo'sh qoldirilsa, Render bergan `RENDER_EXTERNAL_URL` ishlatiladi.
+`FRONTEND_ORIGIN` bo'sh qoldirilsa, frontend origini backend bilan bir xil
+bo'ladi. Render'da oldin Vercel frontend domeni `FRONTEND_ORIGIN` qilib
+saqlangan bo'lsa, uni o'chiring yoki joriy Render originiga almashtiring. Shu
+bois production'da credential cookie uchun same-origin sozlamasi ishlaydi.
 
-```text
-APP_ORIGIN=https://ai-agent-1-d569.onrender.com
-FRONTEND_ORIGIN=https://ai-agent-firdavs25.vercel.app
-GOOGLE_REDIRECT_URI=https://ai-agent-1-d569.onrender.com/api/auth/google/callback
-```
+Google OAuth ishlatilsa, Render service originini Google Cloud Console'da
+Authorized JavaScript origin sifatida va
+`<RENDER_EXTERNAL_URL>/api/auth/google/callback` ni Authorized redirect URI
+sifatida qo'shing. `GOOGLE_REDIRECT_URI` ni Render'da xuddi shu callback URL
+qilib belgilash mumkin.
 
-`APP_ORIGIN` HTTPS bo'lishi Render'dagi secure session cookie'ni yoqadi.
-Vercel va Render originlari turli domenlarda bo'lgani uchun sessiya cookie'si
-`SameSite=None; Secure` bilan yuboriladi. Google OAuth ishlatilsa, Google Cloud
-Console'da yuqoridagi Render callback manzilini ham Authorized redirect URI
-sifatida qo'shing.
+`GET /api/health` server sog'ligini `{"status":"ok"}` bilan tekshiradi.
+Frontenddagi `/profile`, `/dashboard` kabi GET yo'llar React build `index.html`
+ga qaytadi; noma'lum `/api/...` yo'llar esa API 404 sifatida qoladi. SQLite
+saqlash joyi `NAVO_DB_PATH` bilan sozlanadi (default `app.db`); Render lokal
+diskini restart/deploy orasida saqlamaydi. Doimiy foydalanuvchi ma'lumotlari
+kerak bo'lsa, Render persistent diskni `NAVO_DB_PATH` bilan ulash yoki keyinroq
+managed database tanlash kerak bo'ladi.
 
-Backendni tez tekshirish uchun `GET /api/health` endpointi
-`{"status":"ok"}` javobini qaytaradi.
+Tekshirish uchun: `npm run build`, so'ng `npm start`; `http://localhost:5507/`
+frontendni, `http://localhost:5507/api/health` API'ni ochadi.

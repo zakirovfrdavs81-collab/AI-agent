@@ -50,6 +50,7 @@ MAX_CODE_ATTEMPTS = 5
 DAILY_MESSAGE_LIMIT = int(os.getenv("DAILY_MESSAGE_LIMIT", "30"))
 APP_ORIGIN = (
     os.getenv("APP_ORIGIN")
+    or os.getenv("RENDER_EXTERNAL_URL")
     or "http://127.0.0.1:5507"
 ).rstrip("/")
 configured_frontend_origin = (os.getenv("FRONTEND_ORIGIN") or "").strip().rstrip("/")
@@ -74,11 +75,11 @@ else:
 password_hash = PasswordHash.recommended()
 app = FastAPI(title="Gemini Chat")
 cors_origins = {
-    "https://ai-agent-firdavs25.vercel.app",
+    APP_ORIGIN,
     "http://127.0.0.1:5507",
     "http://localhost:5507",
 }
-if FRONTEND_ORIGIN != "*":
+if FRONTEND_ORIGIN not in {"*", APP_ORIGIN}:
     cors_origins.add(FRONTEND_ORIGIN)
 app.add_middleware(
     CORSMiddleware,
@@ -1660,3 +1661,10 @@ async def chat(payload: ChatInput, session: str | None = Cookie(default=None)):
         "daily_limit": DAILY_MESSAGE_LIMIT,
         "notes": notes,
     }
+
+
+@app.get("/{frontend_path:path}", include_in_schema=False)
+async def frontend_route(frontend_path: str):
+    if frontend_path == "api" or frontend_path.startswith("api/"):
+        raise HTTPException(404, "API endpoint topilmadi.")
+    return FileResponse(frontend_page())
