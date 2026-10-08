@@ -22,7 +22,7 @@ Login, SMS, Google OAuth va Gemini so'rovlari faqat shu serverda ishlaydi:
 maxfiy kalitlar shu yerda saqlanadi. `frontend/src/` ichidagi o'zgarishlarni yig'ib
 5507-portda ko'rish uchun `run.bat` ni qayta ishga tushiring.
 
-## 1a. Development — React + FastAPI
+## 1a. Development — bitta server
 
 ```text
 npm install
@@ -30,14 +30,17 @@ python -m pip install -r requirements.txt
 npm run dev
 ```
 
-`npm run dev` FastAPI'ni `http://127.0.0.1:5507` va Vite'ni
-`http://127.0.0.1:5173` manzillarida birgalikda ishga tushiradi. Vite `/api`
-so'rovlarini FastAPI'ga proxy qiladi; development frontend va backend orasida
-alohida CORS yoki API URL sozlamasi kerak emas.
+`npm run dev` aslida bitta FastAPI ilovasi orqali 5507-portda ishlaydigan
+asosiy serverni ishga tushiradi. Bu yerda alohida Vite yoki Live Server kerak
+emas: frontend build qilinadi va FastAPI tomonidan `http://127.0.0.1:5507`
+dan xizmat ko'rsatiladi.
 
-`npm start` yig'ilgan frontend va API'ni `http://127.0.0.1:5507` da bitta
-serverdan uzatadi. 5507-portda FastAPI ishlaganda VS Code Live Server/Go Live'ni
-yoqmang; frontend ustida ishlash uchun `npm run dev` dan foydalaning.
+`npm start` ishlab chiqarish rejimi bo'lib, frontend build dan keyin bitta
+serverda `http://127.0.0.1:5507` ochiladi. Bu server `/api/*` va React
+frontendni bir xil origin dan ishlatadi. VS Code `Go Live` Live Server
+extensiyasi alohida frontend serverni boshlaydi, shuning uchun bu loyihada
+asosiy ishga tushirish manbai `npm run dev` yoki `npm run go-live` bo'lishi
+lozim.
 
 ## 1c. Premium taqdimot sahifasi — `/showcase/`
 

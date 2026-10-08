@@ -7,29 +7,26 @@ import { resolvePythonCommand } from "./python-runtime.js";
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const { command, args } = resolvePythonCommand();
 
-function isPortFree(port) {
+const fallbackLocalPort = 5507;
+const port = Number(process.env.PORT || fallbackLocalPort);
+const host = process.env.HOST || (process.env.PORT ? "0.0.0.0" : "127.0.0.1");
+
+function isPortTaken(portToCheck) {
   return new Promise((resolve) => {
     const server = net.createServer();
     server.unref();
-    server.on("error", () => resolve(false));
-    server.listen(port, "127.0.0.1", () => {
-      server.close(() => resolve(true));
+    server.on("error", () => resolve(true));
+    server.listen(portToCheck, host === "0.0.0.0" ? "0.0.0.0" : "127.0.0.1", () => {
+      server.close(() => resolve(false));
     });
   });
 }
 
-async function resolvePort(preferredPort) {
-  if (process.env.PORT && process.env.PORT !== "") return Number(process.env.PORT);
-  const candidate = Number(preferredPort);
-  if (await isPortFree(candidate)) return candidate;
-  for (let port = candidate + 1; port < candidate + 50; port += 1) {
-    if (await isPortFree(port)) return port;
-  }
-  return candidate;
+const portInUse = await isPortTaken(port);
+if (portInUse && !process.env.PORT) {
+  console.error(`Port ${port} is already in use. Stop the existing process or free port 5507 before starting the app.`);
+  process.exit(1);
 }
-
-const port = await resolvePort(5507);
-const host = process.env.HOST || (process.env.PORT ? "0.0.0.0" : "127.0.0.1");
 
 const backend = spawn(
   command,

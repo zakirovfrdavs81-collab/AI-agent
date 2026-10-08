@@ -9,7 +9,7 @@ const shellArgs = process.platform === "win32" ? ["/c", "npm run build"] : ["-lc
 function runBuildAndStart() {
   const build = spawn(shellCommand, shellArgs, {
     cwd: projectRoot,
-    env: process.env,
+    env: { ...process.env, PORT: "5507", HOST: "127.0.0.1" },
     stdio: "inherit",
   });
 

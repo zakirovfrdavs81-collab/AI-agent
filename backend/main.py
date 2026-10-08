@@ -331,7 +331,8 @@ def channel_for(destination: str) -> str:
     if destination.startswith("+"):
         ready = bool(os.getenv("ESKIZ_EMAIL") and os.getenv("ESKIZ_PASSWORD"))
         return "sms" if ready else "demo"
-    ready = all(os.getenv(name) for name in ("SMTP_HOST", "SMTP_USER", "SMTP_PASSWORD"))
+    host, user, password, _ = get_smtp_config()
+    ready = bool(host and user and password)
     return "email" if ready else "demo"
 
 
@@ -490,14 +491,24 @@ async def send_sms(phone: str, code: str):
             raise HTTPException(502, f"SMS yuborilmadi: {detail}")
 
 
+def get_smtp_config() -> tuple[str, str, str, int]:
+    host = (os.getenv("SMTP_HOST") or "").strip().strip('"\'')
+    user = (os.getenv("SMTP_USER") or os.getenv("SMTP_USERNAME") or "").strip().strip('"\'')
+    password = (os.getenv("SMTP_PASSWORD") or os.getenv("SMTP_PASS") or "").strip().strip('"\'')
+    password = password.replace(" ", "")
+    port_value = (os.getenv("SMTP_PORT") or "465").strip()
+    try:
+        port = int(port_value)
+    except ValueError:
+        port = 465
+    return host, user, password, port
+
+
 def send_email(address: str, code: str) -> bool:
-    host = os.getenv("SMTP_HOST")
-    user = os.getenv("SMTP_USER")
-    password = os.getenv("SMTP_PASSWORD")
+    host, user, password, port = get_smtp_config()
     if not host or not user or not password:
-        logging.error("Email error: SMTP_HOST, SMTP_USER, or SMTP_PASSWORD is not configured")
+        logging.error("Email error: SMTP_HOST, SMTP_USER/SMTP_USERNAME, or SMTP_PASSWORD is not configured")
         return False
-    port = os.getenv("SMTP_PORT", "465")
     message = EmailMessage()
     message["Subject"] = "🔐 Navo AI tasdiqlash kodi"
     message["From"] = formataddr(("Navo AI", user))
@@ -537,7 +548,6 @@ def send_email(address: str, code: str) -> bool:
         subtype="html",
     )
     try:
-        port = int(port)
         if port == 465:
             with smtplib.SMTP_SSL(
                 host, port, timeout=20, context=ssl.create_default_context()
@@ -551,7 +561,8 @@ def send_email(address: str, code: str) -> bool:
                 server.send_message(message)
         return True
     except Exception as error:
-        logging.error(f"Email error: {error}")
+        safe_message = str(error).replace(user, "***MASKED***").replace(password, "***MASKED***")
+        logging.error("Email error: %s", safe_message)
         return False
 
 
@@ -571,9 +582,11 @@ async def issue_code(
     """
     destination = normalize(destination)
     channel = "email" if require_email else channel_for(destination)
-    if require_email and not all(os.getenv(name) for name in ("SMTP_HOST", "SMTP_USER", "SMTP_PASSWORD")):
-        logging.error("Email error: SMTP settings are missing for required email delivery")
-        return None, False
+    if require_email:
+        host, user, password, _ = get_smtp_config()
+        if not (host and user and password):
+            logging.error("Email error: SMTP settings are missing for required email delivery")
+            return None, False
     connection = db()
     try:
         connection.execute("DELETE FROM codes WHERE expires_at < ?", (int(time.time()),))
@@ -676,7 +689,8 @@ async def service_worker():
 async def config():
     """Frontend qaysi kirish usullari yoqilganini shu yerdan biladi."""
     sms_ready = bool(os.getenv("ESKIZ_EMAIL") and os.getenv("ESKIZ_PASSWORD"))
-    email_ready = all(os.getenv(name) for name in ("SMTP_HOST", "SMTP_USER", "SMTP_PASSWORD"))
+    smtp_host, smtp_user, smtp_password, _ = get_smtp_config()
+    email_ready = bool(smtp_host and smtp_user and smtp_password)
     return {
         "google_login": google_ready(),
         "sms_channel": "sms" if sms_ready else "demo",
