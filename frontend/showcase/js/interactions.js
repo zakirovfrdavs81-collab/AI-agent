@@ -209,7 +209,11 @@ function marquee() {
 
 /** "Navo AI'ni ochish" havolalarini joriy muhitga moslab ulaydi. */
 function appLinks() {
-  const target = new URL("/", API_ORIGIN).href;
+  const isLocalHost = window.location.hostname === "127.0.0.1"
+    || window.location.hostname === "localhost";
+  const target = isLocalHost && window.location.port !== "5507"
+    ? "http://127.0.0.1:5507/app/"
+    : new URL("/app/", API_ORIGIN || window.location.origin).href;
   document.querySelectorAll("[data-app-link]").forEach((link) => link.setAttribute("href", target));
   document.querySelectorAll("[data-api-origin]").forEach((label) => {
     label.textContent = new URL(API_ORIGIN).host;

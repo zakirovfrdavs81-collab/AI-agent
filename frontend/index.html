@@ -44,10 +44,6 @@
         if (event.target instanceof HTMLScriptElement && event.target.type === "module") showStartupError();
       }, true);
       window.setTimeout(showStartupError, 12000);
-      const sourceEntry = document.querySelector('script[type="module"][src="/src/main.jsx"]');
-      if (sourceEntry && window.location.pathname === "/" && window.location.port !== "5507") {
-        window.location.replace("/");
-      }
     </script>
     <script type="module" src="/src/main.jsx"></script>
   </body>

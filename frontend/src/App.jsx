@@ -311,8 +311,8 @@ export default function App() {
             google_config: "Google orqali kirish hali sozlanmagan. Serverdagi OAuth sozlamalarini tekshiring.",
             google_state: "Google orqali kirish sessiyasi eskirdi. Qayta urinib ko‘ring.",
             google_failed: "Google orqali kirib bo‘lmadi. Sozlamalarni tekshirib, qayta urinib ko‘ring.",
-            google_otp_setup: "Google orqali xavfsiz kirish uchun .env faylida Gmail SMTP sozlamalarini kiriting.",
-            google_otp_failed: "Google tasdiqlash kodi emailga yuborilmadi. SMTP sozlamalarini tekshirib, qayta urinib ko‘ring.",
+            google_otp_setup: "Google orqali xavfsiz kirish uchun serverda email xizmati sozlamalarini kiriting.",
+            google_otp_failed: "Google tasdiqlash kodi emailga yuborilmadi. Email xizmati sozlamalarini tekshirib, qayta urinib ko‘ring.",
           };
           const params = new URLSearchParams(window.location.search);
           if (params.get("auth_step") === "google_otp" && params.get("destination")) {

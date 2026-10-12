@@ -4,8 +4,33 @@ services:
     runtime: python
     buildCommand: npm install && pip install -r backend/requirements.txt && npm run build
     startCommand: npm start
+    healthCheckPath: /api/health
     envVars:
       - key: PYTHON_VERSION
         value: "3.11"
-      - key: NAVO_DB_PATH
-        value: backend/app.db
+      - key: REQUIRE_DATABASE_URL
+        value: "true"
+      - key: DATABASE_URL
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: EMAIL_PROVIDER
+        value: brevo
+      - key: BREVO_API_KEY
+        sync: false
+      - key: BREVO_SENDER_EMAIL
+        sync: false
+      - key: GOOGLE_CLIENT_ID
+        sync: false
+      - key: GOOGLE_CLIENT_SECRET
+        sync: false
+      - key: ESKIZ_EMAIL
+        sync: false
+      - key: ESKIZ_PASSWORD
+        sync: false
+      - key: DEV_SHOW_OTP
+        value: "false"
+      - key: OTP_MODE
+        value: live

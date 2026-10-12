@@ -31,6 +31,7 @@ from typing import TypedDict
 
 import httpx
 import jwt
+import psycopg
 from dotenv import load_dotenv
 from fastapi import Cookie, FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
@@ -38,6 +39,7 @@ from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from pwdlib import PasswordHash
+from psycopg.rows import dict_row
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 BACKEND_ROOT = Path(__file__).resolve().parent
@@ -46,6 +48,14 @@ ROOT = PROJECT_ROOT
 load_dotenv(PROJECT_ROOT / ".env")
 
 DB = Path(os.getenv("NAVO_DB_PATH", str(BACKEND_ROOT / "app.db")))
+DATABASE_URL = (os.getenv("DATABASE_URL") or "").strip()
+if DATABASE_URL.startswith("postgres://"):
+    DATABASE_URL = "postgresql://" + DATABASE_URL[len("postgres://"):]
+if (
+    (os.getenv("REQUIRE_DATABASE_URL") or "").strip().lower() in {"1", "true", "yes", "on"}
+    and not DATABASE_URL
+):
+    raise RuntimeError("DATABASE_URL is required for this deployment but is not configured.")
 SESSION_DAYS = 30
 CODE_TTL = 300
 CODE_RESEND_SECONDS = 60
@@ -62,6 +72,7 @@ FRONTEND_ORIGIN = (
     if configured_frontend_origin and configured_frontend_origin != "*"
     else APP_ORIGIN
 )
+FRONTEND_APP_URL = f"{FRONTEND_ORIGIN}/app/"
 GOOGLE_REDIRECT_URI = (
     os.getenv("GOOGLE_REDIRECT_URI", "").strip()
     or f"{APP_ORIGIN}/api/auth/google/callback"
@@ -80,14 +91,13 @@ app = FastAPI(title="Gemini Chat")
 cors_origins = {
     APP_ORIGIN,
     "http://127.0.0.1:5507",
-    "http://localhost:5507",
 }
 if FRONTEND_ORIGIN not in {"*", APP_ORIGIN}:
     cors_origins.add(FRONTEND_ORIGIN)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=sorted(cors_origins),
-    allow_origin_regex=r"http://(127\.0\.0\.1|localhost):5507",
+    allow_origin_regex=r"http://127\.0\.0\.1:5507",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -148,22 +158,74 @@ async def security_headers(request: Request, call_next):
     return response
 
 
+class PostgreSQLConnection:
+    def __init__(self, connection):
+        self.connection = connection
+
+    def execute(self, statement: str, parameters=()):
+        return self.connection.execute(statement.replace("?", "%s"), parameters)
+
+    def executescript(self, script: str):
+        for statement in script.split(";"):
+            if statement.strip():
+                self.execute(statement.strip())
+
+    def commit(self):
+        self.connection.commit()
+
+    def close(self):
+        self.connection.close()
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, exception_type, exception, traceback):
+        try:
+            return self.connection.__exit__(exception_type, exception, traceback)
+        finally:
+            self.connection.close()
+
+
 def db():
+    if DATABASE_URL:
+        connection = psycopg.connect(DATABASE_URL, row_factory=dict_row, connect_timeout=15)
+        return PostgreSQLConnection(connection)
     connection = sqlite3.connect(DB, timeout=15)
     connection.row_factory = sqlite3.Row
     return connection
 
 
 def ensure_column(connection, table: str, column: str, definition: str):
-    existing = {row["name"] for row in connection.execute(f"PRAGMA table_info({table})")}
+    if DATABASE_URL:
+        existing = {
+            row["column_name"]
+            for row in connection.execute(
+                "SELECT column_name FROM information_schema.columns "
+                "WHERE table_schema=current_schema() AND table_name=?",
+                (table,),
+            )
+        }
+    else:
+        existing = {row["name"] for row in connection.execute(f"PRAGMA table_info({table})")}
     if column not in existing:
-        connection.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+        if DATABASE_URL:
+            connection.execute(
+                f"ALTER TABLE {table} ADD COLUMN IF NOT EXISTS {column} {definition}"
+            )
+        else:
+            connection.execute(f"ALTER TABLE {table} ADD COLUMN {column} {definition}")
+
+
+def insert_id(connection, statement: str, parameters=()) -> int:
+    if DATABASE_URL:
+        row = connection.execute(f"{statement} RETURNING id", parameters).fetchone()
+        return int(row["id"])
+    return int(connection.execute(statement, parameters).lastrowid)
 
 
 def init_db():
     with db() as connection:
-        connection.executescript(
-            """
+        schema = """
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 email TEXT UNIQUE,
@@ -226,7 +288,12 @@ def init_db():
             CREATE INDEX IF NOT EXISTS conversation_messages_order
                 ON conversation_messages(conversation_id, id);
             """
-        )
+        if DATABASE_URL:
+            schema = schema.replace(
+                "INTEGER PRIMARY KEY AUTOINCREMENT",
+                "BIGINT GENERATED BY DEFAULT AS IDENTITY PRIMARY KEY",
+            )
+        connection.executescript(schema)
         ensure_column(connection, "users", "created_at", "INTEGER NOT NULL DEFAULT 0")
         ensure_column(connection, "users", "nickname", "TEXT")
         ensure_column(connection, "users", "avatar", "TEXT")
@@ -331,9 +398,7 @@ def channel_for(destination: str) -> str:
     if destination.startswith("+"):
         ready = bool(os.getenv("ESKIZ_EMAIL") and os.getenv("ESKIZ_PASSWORD"))
         return "sms" if ready else "demo"
-    host, user, password, _ = get_smtp_config()
-    ready = bool(host and user and password)
-    return "email" if ready else "demo"
+    return "email" if email_delivery_configured() else "demo"
 
 
 def otp_mode() -> str:
@@ -504,22 +569,46 @@ def get_smtp_config() -> tuple[str, str, str, int]:
     return host, user, password, port
 
 
+def get_email_provider() -> str:
+    return (os.getenv("EMAIL_PROVIDER") or "smtp").strip().lower()
+
+
+def email_delivery_configured() -> bool:
+    provider = get_email_provider()
+    if provider == "smtp":
+        host, user, password, _ = get_smtp_config()
+        return bool(host and user and password)
+    if provider == "brevo":
+        return bool(
+            (os.getenv("BREVO_API_KEY") or "").strip()
+            and (os.getenv("BREVO_SENDER_EMAIL") or "").strip()
+        )
+    logging.error("Email error: EMAIL_PROVIDER must be 'smtp' or 'brevo'")
+    return False
+
+
 def send_email(address: str, code: str) -> bool:
+    provider = get_email_provider()
     host, user, password, port = get_smtp_config()
-    if not host or not user or not password:
-        logging.error("Email error: SMTP_HOST, SMTP_USER/SMTP_USERNAME, or SMTP_PASSWORD is not configured")
+    api_key = (os.getenv("BREVO_API_KEY") or "").strip()
+    sender = (os.getenv("BREVO_SENDER_EMAIL") or "").strip()
+    if not email_delivery_configured():
+        if provider == "brevo":
+            logging.error("Email error: BREVO_API_KEY and BREVO_SENDER_EMAIL are required for Brevo delivery")
+        elif provider == "smtp":
+            logging.error("Email error: SMTP_HOST, SMTP_USER/SMTP_USERNAME, or SMTP_PASSWORD is not configured")
         return False
     message = EmailMessage()
     message["Subject"] = "🔐 Navo AI tasdiqlash kodi"
-    message["From"] = formataddr(("Navo AI", user))
+    message["From"] = formataddr(("Navo AI", sender if provider == "brevo" else user))
     message["To"] = address
-    message.set_content(
+    text_body = (
         f"Navo AI tasdiqlash kodi: {code}\n"
         "Kod 5 daqiqa amal qiladi. Xavfsizlik uchun kodni hech kimga bermang."
     )
+    message.set_content(text_body)
     safe_code = html.escape(code)
-    message.add_alternative(
-        f"""\
+    html_body = f"""\
 <!doctype html>
 <html lang="uz">
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"></head>
@@ -544,11 +633,24 @@ def send_email(address: str, code: str) -> bool:
   </table>
 </body>
 </html>
-""",
-        subtype="html",
-    )
+"""
+    message.add_alternative(html_body, subtype="html")
     try:
-        if port == 465:
+        if provider == "brevo":
+            response = httpx.post(
+                "https://api.brevo.com/v3/smtp/email",
+                headers={"accept": "application/json", "api-key": api_key},
+                json={
+                    "sender": {"name": "Navo AI", "email": sender},
+                    "to": [{"email": address}],
+                    "subject": str(message["Subject"]),
+                    "textContent": text_body,
+                    "htmlContent": html_body,
+                },
+                timeout=20,
+            )
+            response.raise_for_status()
+        elif port == 465:
             with smtplib.SMTP_SSL(
                 host, port, timeout=20, context=ssl.create_default_context()
             ) as server:
@@ -561,8 +663,11 @@ def send_email(address: str, code: str) -> bool:
                 server.send_message(message)
         return True
     except Exception as error:
-        safe_message = str(error).replace(user, "***MASKED***").replace(password, "***MASKED***")
-        logging.error("Email error: %s", safe_message)
+        safe_message = str(error)
+        for secret in (user, password, api_key, sender, address):
+            if secret:
+                safe_message = safe_message.replace(secret, "***MASKED***")
+        logging.error("Email error (%s): %s", type(error).__name__, safe_message)
         return False
 
 
@@ -582,11 +687,9 @@ async def issue_code(
     """
     destination = normalize(destination)
     channel = "email" if require_email else channel_for(destination)
-    if require_email:
-        host, user, password, _ = get_smtp_config()
-        if not (host and user and password):
-            logging.error("Email error: SMTP settings are missing for required email delivery")
-            return None, False
+    if require_email and not email_delivery_configured():
+        logging.error("Email error: required email provider is not configured")
+        return None, False
     connection = db()
     try:
         connection.execute("DELETE FROM codes WHERE expires_at < ?", (int(time.time()),))
@@ -595,8 +698,11 @@ async def issue_code(
             raise HTTPException(429, "Kod yaqinda yuborilgan. Bir daqiqadan so‘ng qayta urinib ko‘ring.")
         code = f"{secrets.randbelow(1_000_000):06d}"
         connection.execute(
-            "INSERT OR REPLACE INTO codes (destination, code_hash, expires_at, purpose, attempts) "
-            "VALUES (?, ?, ?, ?, 0)",
+            "INSERT INTO codes (destination, code_hash, expires_at, purpose, attempts) "
+            "VALUES (?, ?, ?, ?, 0) "
+            "ON CONFLICT(destination) DO UPDATE SET "
+            "code_hash=excluded.code_hash, expires_at=excluded.expires_at, "
+            "purpose=excluded.purpose, attempts=0",
             (destination, hashlib.sha256(code.encode()).hexdigest(), int(time.time()) + CODE_TTL, purpose),
         )
         connection.commit()
@@ -651,22 +757,28 @@ def google_ready() -> bool:
 # --- Sahifalar va sozlamalar -------------------------------------------------
 
 def frontend_page() -> Path:
-    """Brauzerga yuboriladigan asosiy sahifa.
-
-    Ustuvorlik: `npm run build` natijasi (dist/index.html) -> legacy.html ->
-    index.html. `index.html` — Vite'ning manba shabloni: uning ichida faqat
-    `<script type="module" src="/src/main.jsx">` turadi, ya'ni JSX'ni faqat
-    Vite (5173) yoki build (dist) ochib bera oladi. Shu sababli uni to'g'ridan
-    to'g'ri uzatish oq (bo'sh) sahifaga olib keladi.
-    """
-    for candidate in (FRONTEND_ROOT / "dist" / "index.html", FRONTEND_ROOT / "legacy.html", FRONTEND_ROOT / "index.html"):
-        if candidate.is_file():
-            return candidate
-    raise HTTPException(status_code=404, detail="Frontend topilmadi. `npm run build` ni bajarib, serverni qayta ishga tushiring.")
+    """Return the built React entry point for the authenticated application."""
+    built_page = FRONTEND_ROOT / "dist" / "index.html"
+    if not built_page.is_file():
+        raise HTTPException(
+            status_code=503,
+            detail="Frontend build topilmadi. `npm run build` ni bajarib, serverni qayta ishga tushiring.",
+        )
+    return built_page
 
 
 @app.get("/")
 async def index():
+    return FileResponse(SHOWCASE / "index.html")
+
+
+@app.get("/app")
+async def app_redirect():
+    return RedirectResponse("/app/", status_code=307)
+
+
+@app.get("/app/")
+async def application():
     return FileResponse(frontend_page())
 
 
@@ -689,8 +801,7 @@ async def service_worker():
 async def config():
     """Frontend qaysi kirish usullari yoqilganini shu yerdan biladi."""
     sms_ready = bool(os.getenv("ESKIZ_EMAIL") and os.getenv("ESKIZ_PASSWORD"))
-    smtp_host, smtp_user, smtp_password, _ = get_smtp_config()
-    email_ready = bool(smtp_host and smtp_user and smtp_password)
+    email_ready = email_delivery_configured()
     return {
         "google_login": google_ready(),
         "sms_channel": "sms" if sms_ready else "demo",
@@ -774,7 +885,7 @@ async def register(payload: RegisterInput):
         else channel_for(destination)
     )
     if channel == "email" and not email_sent:
-        message = "Hisob yaratildi, ammo email yuborilmadi. SMTP sozlamalarini tekshiring va kodni qayta yuboring."
+        message = "Hisob yaratildi, ammo email yuborilmadi. Email xizmati sozlamalarini tekshiring va kodni qayta yuboring."
     else:
         message = (
             f"Tasdiqlash kodi {channel_label(channel)} yuborildi."
@@ -836,11 +947,12 @@ async def verify_code(payload: CodeInput, response: Response):
                 )
                 user_id = by_email["id"]
             else:
-                user_id = connection.execute(
+                user_id = insert_id(
+                    connection,
                     "INSERT INTO users(email, google_sub, verified, nickname, created_at) "
                     "VALUES (?, ?, 1, ?, ?)",
                     (destination, google_sub, google_nickname, int(time.time())),
-                ).lastrowid
+                )
             connection.execute("DELETE FROM pending_google_auth WHERE email=?", (destination,))
             user = connection.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
         access_token = start_session(response, user["id"])
@@ -905,11 +1017,13 @@ async def login(payload: LoginInput, response: Response):
         return {
             "require_otp": False,
             "email_sent": False,
-            "message": "Tasdiqlash emaili yuborilmadi. Serverdagi SMTP sozlamalarini tekshiring.",
+            "message": "Tasdiqlash emaili yuborilmadi. Serverdagi email xizmati sozlamalarini tekshiring.",
         }
     with db() as connection:
         connection.execute(
-            "INSERT OR REPLACE INTO pending_login_auth(email, user_id, expires_at) VALUES (?, ?, ?)",
+            "INSERT INTO pending_login_auth(email, user_id, expires_at) VALUES (?, ?, ?) "
+            "ON CONFLICT(email) DO UPDATE SET "
+            "user_id=excluded.user_id, expires_at=excluded.expires_at",
             (email, user["id"], int(time.time()) + CODE_TTL),
         )
     return {
@@ -965,7 +1079,7 @@ async def forgot(payload: ForgotInput):
     if channel == "email" and not email_sent:
         return {
             "success": False,
-            "message": "Tiklash kodi emailga yuborilmadi. Serverdagi SMTP sozlamalarini tekshiring.",
+            "message": "Tiklash kodi emailga yuborilmadi. Serverdagi email xizmati sozlamalarini tekshiring.",
             "destination": destination,
             "channel": channel,
             "email_sent": False,
@@ -1026,7 +1140,7 @@ async def resend(payload: ResendInput):
     if channel == "email" and not email_sent:
         return {
             "success": False,
-            "message": "Tasdiqlash emaili yuborilmadi. Serverdagi SMTP sozlamalarini tekshiring.",
+            "message": "Tasdiqlash emaili yuborilmadi. Serverdagi email xizmati sozlamalarini tekshiring.",
             "destination": destination,
             "channel": channel,
             "email_sent": False,
@@ -1079,7 +1193,7 @@ async def reset(payload: ResetInput):
 @app.get("/api/auth/google")
 async def google_start():
     if not google_ready():
-        return RedirectResponse(f"{FRONTEND_ORIGIN}/?auth_error=google_config")
+        return RedirectResponse(f"{FRONTEND_APP_URL}?auth_error=google_config")
     state = secrets.token_urlsafe(24)
     with db() as connection:
         connection.execute("INSERT INTO oauth_states VALUES (?, ?)", (state, int(time.time()) + 600))
@@ -1101,14 +1215,14 @@ async def google_start():
 @app.get("/api/auth/callback/google")
 async def google_callback(request: Request, code: str = "", state: str = ""):
     if not google_ready():
-        return RedirectResponse(f"{FRONTEND_ORIGIN}/?auth_error=google_config")
+        return RedirectResponse(f"{FRONTEND_APP_URL}?auth_error=google_config")
     with db() as connection:
         valid = connection.execute(
             "SELECT state FROM oauth_states WHERE state=? AND expires_at>?", (state, int(time.time()))
         ).fetchone()
         connection.execute("DELETE FROM oauth_states WHERE state=?", (state,))
     if not valid or not code:
-        return RedirectResponse(f"{FRONTEND_ORIGIN}/?auth_error=google_state")
+        return RedirectResponse(f"{FRONTEND_APP_URL}?auth_error=google_state")
     try:
         async with httpx.AsyncClient(timeout=25) as client:
             token_response = await client.post(
@@ -1133,7 +1247,7 @@ async def google_callback(request: Request, code: str = "", state: str = ""):
             profile.raise_for_status()
             google_user = profile.json()
     except httpx.HTTPError:
-        return RedirectResponse(f"{FRONTEND_ORIGIN}/?auth_error=google_failed")
+        return RedirectResponse(f"{FRONTEND_APP_URL}?auth_error=google_failed")
     google_sub = google_user.get("sub")
     email = normalize(google_user.get("email", ""))
     if (
@@ -1142,12 +1256,15 @@ async def google_callback(request: Request, code: str = "", state: str = ""):
         or google_user.get("aud") != os.getenv("GOOGLE_CLIENT_ID")
         or str(google_user.get("email_verified", "")).lower() != "true"
     ):
-        return RedirectResponse(f"{FRONTEND_ORIGIN}/?auth_error=google_failed")
+        return RedirectResponse(f"{FRONTEND_APP_URL}?auth_error=google_failed")
     google_nickname = (google_user.get("name") or email.split("@")[0]).strip()[:40] or None
     with db() as connection:
         connection.execute(
-            "INSERT OR REPLACE INTO pending_google_auth(email, google_sub, nickname, expires_at) "
-            "VALUES (?, ?, ?, ?)",
+            "INSERT INTO pending_google_auth(email, google_sub, nickname, expires_at) "
+            "VALUES (?, ?, ?, ?) "
+            "ON CONFLICT(email) DO UPDATE SET "
+            "google_sub=excluded.google_sub, nickname=excluded.nickname, "
+            "expires_at=excluded.expires_at",
             (email, google_sub, google_nickname, int(time.time()) + CODE_TTL * 2),
         )
     try:
@@ -1161,18 +1278,18 @@ async def google_callback(request: Request, code: str = "", state: str = ""):
                 ).fetchone()
             if active_google_code:
                 query = httpx.QueryParams({"auth_step": "google_otp", "destination": email})
-                return RedirectResponse(f"{FRONTEND_ORIGIN}/?{query}")
+                return RedirectResponse(f"{FRONTEND_APP_URL}?{query}")
         with db() as connection:
             connection.execute("DELETE FROM pending_google_auth WHERE email=?", (email,))
         logging.warning("Google email OTP could not be issued: %s", error.detail)
         error_code = "google_otp_setup" if error.status_code == 503 else "google_otp_failed"
-        return RedirectResponse(f"{FRONTEND_ORIGIN}/?auth_error={error_code}")
+        return RedirectResponse(f"{FRONTEND_APP_URL}?auth_error={error_code}")
     if not email_sent:
         with db() as connection:
             connection.execute("DELETE FROM pending_google_auth WHERE email=?", (email,))
-        return RedirectResponse(f"{FRONTEND_ORIGIN}/?auth_error=google_otp_failed")
+        return RedirectResponse(f"{FRONTEND_APP_URL}?auth_error=google_otp_failed")
     query = httpx.QueryParams({"auth_step": "google_otp", "destination": email})
-    return RedirectResponse(f"{FRONTEND_ORIGIN}/?{query}")
+    return RedirectResponse(f"{FRONTEND_APP_URL}?{query}")
 
 
 # --- Suhbatlar, profil va statistika -----------------------------------------
@@ -1330,10 +1447,11 @@ async def create_conversation(payload: ConversationInput, session: str | None = 
     user = require_user(session)
     stamp = int(time.time())
     with db() as connection:
-        new_id = connection.execute(
+        new_id = insert_id(
+            connection,
             "INSERT INTO conversations (user_id, title, created_at, updated_at) VALUES (?, ?, ?, ?)",
             (user["id"], payload.title.strip(), stamp, stamp),
-        ).lastrowid
+        )
         row = connection.execute("SELECT * FROM conversations WHERE id=?", (new_id,)).fetchone()
     return {"conversation": conversation_summary(row), "message": "Yangi suhbat yaratildi."}
 
@@ -1661,10 +1779,11 @@ async def chat(payload: ChatInput, session: str | None = Cookie(default=None)):
         conversation_id = payload.conversation_id
         if conversation_id is None:
             first_line = next((line.strip() for line in payload.prompt.splitlines() if line.strip()), "")
-            created_conversation_id = connection.execute(
+            created_conversation_id = insert_id(
+                connection,
                 "INSERT INTO conversations (user_id, title, created_at, updated_at) VALUES (?, ?, ?, ?)",
                 (user["id"], first_line[:72] or "Yangi suhbat", stamp, stamp),
-            ).lastrowid
+            )
             if created_conversation_id is None:
                 raise HTTPException(500, "Suhbat yaratilmadi. Qayta urinib ko‘ring.")
             conversation_id = created_conversation_id
@@ -1684,4 +1803,6 @@ async def chat(payload: ChatInput, session: str | None = Cookie(default=None)):
 async def frontend_route(frontend_path: str):
     if frontend_path == "api" or frontend_path.startswith("api/"):
         raise HTTPException(404, "API endpoint topilmadi.")
-    return FileResponse(frontend_page())
+    if frontend_path == "app" or frontend_path.startswith("app/"):
+        return FileResponse(frontend_page())
+    raise HTTPException(404, "Sahifa topilmadi.")

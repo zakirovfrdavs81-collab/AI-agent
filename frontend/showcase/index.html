@@ -6,12 +6,42 @@
     <title>Navo AI — fikringizga yo‘l oching</title>
     <meta name="description" content="Navo AI — o‘zbek tilidagi aqlli yordamchi. Ovoz, fayllar va hujjatlar bilan ishlaydigan premium AI yordamchi taqdimoti." />
     <meta name="theme-color" content="#08090f" />
-    <link rel="icon" type="image/svg+xml" href="./assets/logo.svg" />
-    <link rel="apple-touch-icon" href="./assets/logo-192.png" />
+    <link rel="icon" type="image/svg+xml" href="/showcase/assets/logo.svg" />
+    <link rel="apple-touch-icon" href="/showcase/assets/logo-192.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap" />
-    <script src="./vendor/tailwind.js"></script>
+    <script>
+      (() => {
+        const localHost = window.location.hostname === "127.0.0.1"
+          || window.location.hostname === "localhost";
+        if (!localHost || window.location.port === "5507") return;
+
+        const appUrl = "http://127.0.0.1:5507/";
+        const showLaunchHelp = () => {
+          const style = document.createElement("style");
+          style.textContent = `
+            body > :not(#navo-app-launch-help) { display: none !important; }
+            #navo-app-launch-help {
+              position: fixed; inset: 0; z-index: 2147483647; display: grid;
+              place-items: center; padding: 24px; background: #08090f;
+              color: #eae8f5; font: 16px/1.6 system-ui, sans-serif; text-align: center;
+            }
+            #navo-app-launch-help a { color: #a99bfa; }
+          `;
+          const message = document.createElement("main");
+          message.id = "navo-app-launch-help";
+          message.innerHTML = '<div><h1>Navo AI serveri ishga tushmagan</h1><p>Bu Live Server orqali ochilgan statik sahifa; haqiqiy sayt FastAPI serverida ishlaydi.</p><p>VS Code’da <strong>Ctrl+Shift+B</strong> tugmalarini bosib, “Navo AI Go Live (Chrome, 5507)” taskini ishga tushiring.</p><p><a href="http://127.0.0.1:5507/">Navo AI bosh sahifasini ochish</a></p></div>';
+          document.head.append(style);
+          (document.body || document.documentElement).append(message);
+        };
+
+        fetch(`${appUrl}api/health`, { cache: "no-store", mode: "no-cors" })
+          .then(() => window.location.replace(appUrl))
+          .catch(showLaunchHelp);
+      })();
+    </script>
+    <script src="/showcase/vendor/tailwind.js"></script>
     <script>
       tailwind.config = {
         theme: {
@@ -30,7 +60,7 @@
         },
       };
     </script>
-    <link rel="stylesheet" href="./css/showcase.css" />
+    <link rel="stylesheet" href="/showcase/css/showcase.css" />
     <script>
       // JS bor: reveal holatlari ishlaydi. Xato bo'lsa preloader va yashirin
       // kontent darhol ochiladi (sahifa hech qachon bo'sh qolmaydi).
@@ -48,7 +78,7 @@
   <body class="font-sans antialiased">
     <!-- Kirish ekrani -->
     <div class="preloader" data-preloader>
-      <img src="./assets/logo.svg" alt="Navo AI" width="58" height="58" />
+      <img src="/showcase/assets/logo.svg" alt="Navo AI" width="58" height="58" />
       <div class="preloader-bar"><span></span></div>
       <p class="m-0 text-[11px] font-semibold tracking-[.22em] text-[#9c99b4] uppercase">Navo AI yuklanmoqda</p>
     </div>
@@ -66,7 +96,7 @@
     <header class="site-nav" data-nav>
       <div class="mx-auto flex h-[68px] w-full max-w-[1240px] items-center justify-between px-5 sm:px-8">
         <a class="flex items-center gap-3 no-underline" href="#top" data-cursor="">
-          <img class="h-9 w-9 rounded-xl" src="./assets/logo.svg" alt="Navo AI logotipi" width="36" height="36" />
+          <img class="h-9 w-9 rounded-xl" src="/showcase/assets/logo.svg" alt="Navo AI logotipi" width="36" height="36" />
           <span class="font-display text-[17px] font-extrabold tracking-[-.04em] text-[#eae8f5]">Navo<span class="text-[#a99bfa]">.ai</span></span>
         </a>
         <nav class="hidden items-center gap-8 md:flex">
@@ -74,7 +104,7 @@
           <a class="nav-link" href="#jarayon">Ish jarayoni</a>
           <a class="nav-link" href="#natijalar">Natijalar</a>
         </nav>
-        <a class="btn btn-primary !px-5 !py-2.5 !text-[.82rem]" href="#" data-app-link data-magnetic="0.24" data-cursor="Ochish">
+        <a class="btn btn-primary !px-5 !py-2.5 !text-[.82rem]" href="/app/" data-app-link data-magnetic="0.24" data-cursor="Ochish">
           Ilovani ochish
           <span class="btn-icon" aria-hidden="true">→</span>
         </a>
@@ -101,7 +131,7 @@
           </p>
 
           <div class="mt-9 flex flex-wrap items-center gap-4" data-reveal data-reveal-on="load">
-            <a class="btn btn-primary" href="#" data-app-link data-magnetic="0.3" data-cursor="Boshlash">
+            <a class="btn btn-primary" href="/app/" data-app-link data-magnetic="0.3" data-cursor="Boshlash">
               Navo AI’ni ochish
               <span class="btn-icon" aria-hidden="true">→</span>
             </a>
@@ -122,7 +152,7 @@
             <span class="tilt-glare" aria-hidden="true"></span>
             <div class="tilt-inner">
               <div class="mb-4 flex items-center gap-3">
-                <img class="h-8 w-8 rounded-[10px]" src="./assets/logo.svg" alt="" width="32" height="32" />
+                <img class="h-8 w-8 rounded-[10px]" src="/showcase/assets/logo.svg" alt="" width="32" height="32" />
                 <div class="leading-tight">
                   <p class="m-0 text-[.82rem] font-bold">Navo 2.5</p>
                   <p class="m-0 flex items-center gap-1.5 text-[.68rem] text-[#8ce4ce]"><span class="dot-live"></span> Onlayn</p>
@@ -363,7 +393,7 @@
             va suhbatni boshlang.
           </p>
           <div class="mt-10 flex flex-wrap items-center justify-center gap-4" data-reveal>
-            <a class="btn btn-primary !px-8 !py-4" href="#" data-app-link data-magnetic="0.32" data-cursor="Boshlash">
+            <a class="btn btn-primary !px-8 !py-4" href="/app/" data-app-link data-magnetic="0.32" data-cursor="Boshlash">
               Navo AI’ni ochish
               <span class="btn-icon" aria-hidden="true">→</span>
             </a>
@@ -378,7 +408,7 @@
       <footer class="relative border-t border-[rgba(154,148,200,.16)] py-10">
         <div class="mx-auto flex w-full max-w-[1240px] flex-wrap items-center justify-between gap-6 px-5 sm:px-8">
           <div class="flex items-center gap-3">
-            <img class="h-8 w-8 rounded-[10px]" src="./assets/logo.svg" alt="Navo AI" width="32" height="32" />
+            <img class="h-8 w-8 rounded-[10px]" src="/showcase/assets/logo.svg" alt="Navo AI" width="32" height="32" />
             <div class="leading-tight">
               <p class="m-0 font-display text-[.95rem] font-bold">Navo<span class="text-[#a99bfa]">.ai</span></p>
               <p class="m-0 text-[.72rem] text-[#7f7c96]">O‘zbek tilidagi aqlli yordamchi</p>
@@ -393,10 +423,10 @@
       </footer>
     </main>
 
-    <script src="./vendor/gsap.min.js"></script>
-    <script src="./vendor/ScrollTrigger.min.js"></script>
-    <script src="./vendor/lenis.min.js"></script>
-    <script type="module" src="./js/main.js"></script>
+    <script src="/showcase/vendor/gsap.min.js"></script>
+    <script src="/showcase/vendor/ScrollTrigger.min.js"></script>
+    <script src="/showcase/vendor/lenis.min.js"></script>
+    <script type="module" src="/showcase/js/main.js"></script>
     <script>
       const year = document.getElementById("year");
       if (year) year.textContent = String(new Date().getFullYear());

@@ -8,7 +8,7 @@
     "build": "vite build --config frontend/vite.config.js",
     "watch": "vite build --config frontend/vite.config.js --watch",
     "start": "node scripts/start.js",
-    "go-live": "npm run build && node scripts/start.js"
+    "go-live": "node scripts/dev.js --open-browser"
   },
   "allowScripts": {
     "esbuild": true
