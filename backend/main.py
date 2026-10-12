@@ -1014,11 +1014,10 @@ async def login(payload: LoginInput, response: Response):
             raise
         email_sent = True
     if not email_sent:
-        return {
-            "require_otp": False,
-            "email_sent": False,
-            "message": "Tasdiqlash emaili yuborilmadi. Serverdagi email xizmati sozlamalarini tekshiring.",
-        }
+        raise HTTPException(
+            502,
+            "Tasdiqlash emaili yuborilmadi. Server logidagi SMTP yoki email provayderi xatosini tekshiring.",
+        )
     with db() as connection:
         connection.execute(
             "INSERT INTO pending_login_auth(email, user_id, expires_at) VALUES (?, ?, ?) "

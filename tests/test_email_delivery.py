@@ -1,8 +1,11 @@
+import asyncio
 import os
+import smtplib
 import unittest
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import httpx
+from fastapi import HTTPException, Response
 
 from backend import main
 
@@ -32,6 +35,55 @@ class EmailDeliveryTests(unittest.TestCase):
             "app-password",
         )
         smtp.assert_not_called()
+
+    def test_smtp_disconnect_is_not_reported_as_sent(self):
+        environment = {
+            "EMAIL_PROVIDER": "smtp",
+            "SMTP_HOST": "smtp.gmail.com",
+            "SMTP_PORT": "465",
+            "SMTP_USER": "sender@example.com",
+            "SMTP_PASSWORD": "app-password",
+        }
+        with (
+            patch.dict(os.environ, environment, clear=True),
+            patch.object(main.ssl, "create_default_context"),
+            patch.object(
+                main.smtplib,
+                "SMTP_SSL",
+                side_effect=smtplib.SMTPServerDisconnected("Connection unexpectedly closed"),
+            ),
+        ):
+            with self.assertLogs(level="ERROR") as captured:
+                sent = main.send_email("recipient@example.com", "123456")
+
+        self.assertFalse(sent)
+        diagnostic = "\n".join(captured.output)
+        self.assertIn("SMTPServerDisconnected", diagnostic)
+        self.assertNotIn("app-password", diagnostic)
+        self.assertNotIn("recipient@example.com", diagnostic)
+
+    def test_login_returns_gateway_error_when_otp_email_fails(self):
+        user = {
+            "id": 7,
+            "password_hash": "stored-hash",
+            "verified": True,
+            "email": "user@example.com",
+        }
+
+        async def run_login():
+            with (
+                patch.object(main, "rate_limit"),
+                patch.object(main, "find_user", return_value=user),
+                patch.object(main.password_hash, "verify", return_value=True),
+                patch.object(main, "issue_code", new=AsyncMock(return_value=(None, False))),
+            ):
+                await main.login(main.LoginInput(identity="user@example.com", password="valid-password"), Response())
+
+        with self.assertRaises(HTTPException) as raised:
+            asyncio.run(run_login())
+
+        self.assertEqual(raised.exception.status_code, 502)
+        self.assertIn("Tasdiqlash emaili yuborilmadi", raised.exception.detail)
 
     def test_brevo_sends_transactional_email_over_https(self):
         environment = {
