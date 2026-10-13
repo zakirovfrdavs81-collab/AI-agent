@@ -25,12 +25,15 @@ if errorlevel 1 goto :build_failed
 if not exist "frontend\dist\index.html" goto :dist_missing
 if not exist "frontend\dist\assets" goto :dist_missing
 echo.
-echo Sayt manzili:       http://127.0.0.1:5507
-echo Taqdimot sahifasi:  http://127.0.0.1:5507/showcase/
+if "%PORT%"=="" set PORT=5507
+if "%FORWARDED_ALLOW_IPS%"=="" set FORWARDED_ALLOW_IPS=*
+echo Bosh sahifa (Landing):  http://127.0.0.1:%PORT%/
+echo React ilova:            http://127.0.0.1:%PORT%/app/
+echo API tekshiruvi:         http://127.0.0.1:%PORT%/health
 echo Serverni to'xtatish uchun Ctrl+C bosing.
 npm start
 echo.
-echo Server to'xtadi. 5507-port band bo'lsa, boshqa ilova uni ishlatayotgan bo'lishi mumkin.
+echo Server to'xtadi. %PORT%-port band bo'lsa, boshqa ilova uni ishlatayotgan bo'lishi mumkin.
 pause
 exit /b 1
 

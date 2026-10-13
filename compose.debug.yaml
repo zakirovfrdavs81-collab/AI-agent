@@ -1,0 +1,6 @@
+services:
+  aiagent:
+    image: aiagent
+    build:
+      context: .
+      dockerfile: ./Dockerfile

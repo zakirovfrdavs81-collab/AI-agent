@@ -15,30 +15,9 @@
       (() => {
         const localHost = window.location.hostname === "127.0.0.1"
           || window.location.hostname === "localhost";
-        if (!localHost || window.location.port === "5507") return;
-
-        const appUrl = "http://127.0.0.1:5507/";
-        const showLaunchHelp = () => {
-          const style = document.createElement("style");
-          style.textContent = `
-            body > :not(#navo-app-launch-help) { display: none !important; }
-            #navo-app-launch-help {
-              position: fixed; inset: 0; z-index: 2147483647; display: grid;
-              place-items: center; padding: 24px; background: #08090f;
-              color: #eae8f5; font: 16px/1.6 system-ui, sans-serif; text-align: center;
-            }
-            #navo-app-launch-help a { color: #a99bfa; }
-          `;
-          const message = document.createElement("main");
-          message.id = "navo-app-launch-help";
-          message.innerHTML = '<div><h1>Navo AI serveri ishga tushmagan</h1><p>Bu Live Server orqali ochilgan statik sahifa; haqiqiy sayt FastAPI serverida ishlaydi.</p><p>VS Code’da <strong>Ctrl+Shift+B</strong> tugmalarini bosib, “Navo AI Go Live (Chrome, 5507)” taskini ishga tushiring.</p><p><a href="http://127.0.0.1:5507/">Navo AI bosh sahifasini ochish</a></p></div>';
-          document.head.append(style);
-          (document.body || document.documentElement).append(message);
-        };
-
-        fetch(`${appUrl}api/health`, { cache: "no-store", mode: "no-cors" })
-          .then(() => window.location.replace(appUrl))
-          .catch(showLaunchHelp);
+        if (localHost && window.location.port !== "5507") {
+          window.location.replace("http://127.0.0.1:5507" + (window.location.pathname.includes("/app") ? "/app/" : "/"));
+        }
       })();
     </script>
     <script src="/showcase/vendor/tailwind.js"></script>
@@ -82,11 +61,6 @@
       <div class="preloader-bar"><span></span></div>
       <p class="m-0 text-[11px] font-semibold tracking-[.22em] text-[#9c99b4] uppercase">Navo AI yuklanmoqda</p>
     </div>
-
-    <!-- Maxsus kursor -->
-    <span class="cursor-dot" data-cursor-dot aria-hidden="true"></span>
-    <span class="cursor-ring" data-cursor-ring aria-hidden="true"><span class="cursor-label" data-cursor-label></span></span>
-    <canvas class="cursor-trail" data-cursor-trail aria-hidden="true"></canvas>
 
     <!-- Fon: WebGL zarrachalar + panjara + donadorlik -->
     <div class="bg-scene" data-scene aria-hidden="true"></div>
@@ -221,10 +195,10 @@
         </div>
 
         <div class="mt-14 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-          <article class="tilt glass rounded-[22px] p-6" data-tilt="7" data-reveal data-cursor="">
+          <article class="tilt glass rounded-[22px] p-6" data-tilt="7" data-reveal data-reveal-direction="left" data-cursor="">
             <span class="tilt-glare" aria-hidden="true"></span>
             <div class="tilt-inner">
-              <span class="icon-chip">
+              <span class="icon-chip" data-reveal-spin="180">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V5a3 3 0 0 0-3-3z" /><path d="M19 10a7 7 0 0 1-14 0" /><path d="M12 17v5" /></svg>
               </span>
               <h3 class="mt-5 mb-2 font-display text-[1.06rem] font-bold">Ovoz bilan suhbat</h3>
@@ -234,7 +208,7 @@
             </div>
           </article>
 
-          <article class="tilt glass rounded-[22px] p-6" data-tilt="7" data-reveal data-cursor="">
+          <article class="tilt glass rounded-[22px] p-6" data-tilt="7" data-reveal data-reveal-direction="right" data-cursor="">
             <span class="tilt-glare" aria-hidden="true"></span>
             <div class="tilt-inner">
               <span class="icon-chip">
@@ -247,7 +221,7 @@
             </div>
           </article>
 
-          <article class="tilt glass rounded-[22px] p-6" data-tilt="7" data-reveal data-cursor="">
+          <article class="tilt glass rounded-[22px] p-6" data-tilt="7" data-reveal data-reveal-direction="up" data-cursor="">
             <span class="tilt-glare" aria-hidden="true"></span>
             <div class="tilt-inner">
               <span class="icon-chip">
@@ -260,10 +234,10 @@
             </div>
           </article>
 
-          <article class="tilt glass rounded-[22px] p-6" data-tilt="7" data-reveal data-cursor="">
+          <article class="tilt glass rounded-[22px] p-6" data-tilt="7" data-reveal data-reveal-direction="left" data-cursor="">
             <span class="tilt-glare" aria-hidden="true"></span>
             <div class="tilt-inner">
-              <span class="icon-chip">
+              <span class="icon-chip" data-reveal-spin="360">
                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12" /><path d="m7 10 5 5 5-5" /><path d="M5 21h14" /></svg>
               </span>
               <h3 class="mt-5 mb-2 font-display text-[1.06rem] font-bold">Eksport qilish</h3>
@@ -273,7 +247,7 @@
             </div>
           </article>
 
-          <article class="tilt glass rounded-[22px] p-6" data-tilt="7" data-reveal data-cursor="">
+          <article class="tilt glass rounded-[22px] p-6" data-tilt="7" data-reveal data-reveal-direction="right" data-cursor="">
             <span class="tilt-glare" aria-hidden="true"></span>
             <div class="tilt-inner">
               <span class="icon-chip">
@@ -286,7 +260,7 @@
             </div>
           </article>
 
-          <article class="tilt glass rounded-[22px] p-6" data-tilt="7" data-reveal data-cursor="">
+          <article class="tilt glass rounded-[22px] p-6" data-tilt="7" data-reveal data-reveal-direction="up" data-cursor="">
             <span class="tilt-glare" aria-hidden="true"></span>
             <div class="tilt-inner">
               <span class="icon-chip">

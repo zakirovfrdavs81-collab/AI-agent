@@ -116,7 +116,7 @@ function pointsField(THREE, holder, { small }) {
     positions[index * 3 + 1] = (Math.random() - 0.5) * 620;
     positions[index * 3 + 2] = (Math.random() - 0.5) * 340;
     seeds[index] = Math.random();
-    scales[index] = 0.7 + Math.random() * 2.1;
+    scales[index] = 1.05 + Math.random() * 3.15;
     const tint = palette[(Math.random() * palette.length) | 0];
     colors[index * 3] = tint[0];
     colors[index * 3 + 1] = tint[1];
@@ -132,8 +132,8 @@ function pointsField(THREE, holder, { small }) {
   const uniforms = {
     uTime: { value: 0 },
     uPointer: { value: new THREE.Vector2(0, 0) },
-    uSize: { value: 26 },
-    uOpacity: { value: 0.72 },
+    uSize: { value: 30 },
+    uOpacity: { value: 0.78 },
     uPixelRatio: { value: renderer.getPixelRatio() },
   };
 
@@ -151,7 +151,7 @@ function pointsField(THREE, holder, { small }) {
 
   const pointer = { x: 0, y: 0 };
   const smooth = { x: 0, y: 0 };
-  const clock = new THREE.Clock();
+  const startedAt = performance.now();
   let frame = 0;
   let visible = !document.hidden;
 
@@ -172,7 +172,7 @@ function pointsField(THREE, holder, { small }) {
     smooth.x += (pointer.x - smooth.x) * 0.055;
     smooth.y += (pointer.y - smooth.y) * 0.055;
     uniforms.uPointer.value.set(smooth.x, smooth.y);
-    uniforms.uTime.value = clock.getElapsedTime();
+    uniforms.uTime.value = (performance.now() - startedAt) / 1000;
     cloud.rotation.z = smooth.x * 0.00035;
     cloud.rotation.x = -smooth.y * 0.0004;
     renderer.render(scene, camera);
@@ -181,7 +181,6 @@ function pointsField(THREE, holder, { small }) {
 
   const start = () => {
     if (frame || !visible) return;
-    clock.start();
     frame = requestAnimationFrame(render);
   };
 

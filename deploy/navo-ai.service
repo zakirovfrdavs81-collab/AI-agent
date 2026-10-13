@@ -1,0 +1,40 @@
+# ==============================================================================
+# Navo AI - Systemd Service Fayli
+# Ushbu faylni /etc/systemd/system/navo-ai.service manziliga joylashtiring.
+# Ishga tushirish buyruqlari:
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable navo-ai
+#   sudo systemctl start navo-ai
+#   sudo systemctl status navo-ai
+# ==============================================================================
+
+[Unit]
+Description=Navo AI FastAPI Application
+After=network.target
+
+[Service]
+Type=simple
+User=www-data
+Group=www-data
+WorkingDirectory=/var/www/navo-ai
+
+# Python virtual muhitidagi uvicorn yo'li
+Environment="PATH=/var/www/navo-ai/.venv/bin:/usr/local/bin:/usr/bin:/bin"
+Environment="FORWARDED_ALLOW_IPS=*"
+EnvironmentFile=/var/www/navo-ai/.env
+
+# Ishga tushirish buyrug'i: reverse proxy sarlavhalari bilan
+ExecStart=/var/www/navo-ai/.venv/bin/uvicorn backend.main:app --host 127.0.0.1 --port 5507 --proxy-headers
+
+# Qayta ishga tushirish siyosati (avto-restart)
+Restart=always
+RestartSec=5
+
+# Xavfsizlik cheklovlari
+LimitNOFILE=65535
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=navo-ai
+
+[Install]
+WantedBy=multi-user.target

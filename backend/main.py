@@ -46,6 +46,27 @@ BACKEND_ROOT = Path(__file__).resolve().parent
 FRONTEND_ROOT = PROJECT_ROOT / "frontend"
 ROOT = PROJECT_ROOT
 load_dotenv(PROJECT_ROOT / ".env")
+os.environ.setdefault("FORWARDED_ALLOW_IPS", "*")
+
+
+class SensitiveDataFilter(logging.Filter):
+    PATTERNS = [
+        (re.compile(r"(bearer\s+)[a-zA-Z0-9_\-\.]{15,}", re.IGNORECASE), r"\1***MASKED***"),
+        (re.compile(r"(api[_\-]?key[=:\s]+)[a-zA-Z0-9_\-\.]{15,}", re.IGNORECASE), r"\1***MASKED***"),
+        (re.compile(r"(password[=:\s]+)[^\s,;&'\"]+", re.IGNORECASE), r"\1***MASKED***"),
+        (re.compile(r"(client_secret[=:\s]+)[^\s,;&'\"]+", re.IGNORECASE), r"\1***MASKED***"),
+        (re.compile(r"(session[=:\s]+)[a-zA-Z0-9_\-\.]{25,}", re.IGNORECASE), r"\1***MASKED***"),
+    ]
+
+    def filter(self, record: logging.LogRecord) -> bool:
+        if isinstance(record.msg, str):
+            for pattern, repl in self.PATTERNS:
+                record.msg = pattern.sub(repl, record.msg)
+        return True
+
+
+for _logger_name in ("", "uvicorn", "uvicorn.error", "uvicorn.access"):
+    logging.getLogger(_logger_name).addFilter(SensitiveDataFilter())
 
 DB = Path(os.getenv("NAVO_DB_PATH", str(BACKEND_ROOT / "app.db")))
 DATABASE_URL = (os.getenv("DATABASE_URL") or "").strip()
@@ -60,11 +81,31 @@ SESSION_DAYS = 30
 CODE_TTL = 300
 CODE_RESEND_SECONDS = 60
 MAX_CODE_ATTEMPTS = 5
+HOST = (os.getenv("HOST") or "0.0.0.0").strip()
+try:
+    PORT = int((os.getenv("PORT") or "5507").strip())
+except ValueError:
+    PORT = 5507
+
+ENVIRONMENT = (
+    os.getenv("ENVIRONMENT") or os.getenv("ENV") or os.getenv("NODE_ENV") or "development"
+).strip().lower()
+
+
+def is_production() -> bool:
+    if ENVIRONMENT in {"production", "prod"}:
+        return True
+    origin = (os.getenv("APP_ORIGIN") or "").strip().lower()
+    if origin.startswith("https://") and not ("localhost" in origin or "127.0.0.1" in origin):
+        return True
+    return False
+
+
 DAILY_MESSAGE_LIMIT = int(os.getenv("DAILY_MESSAGE_LIMIT", "30"))
 APP_ORIGIN = (
     os.getenv("APP_ORIGIN")
     or os.getenv("RENDER_EXTERNAL_URL")
-    or f"http://127.0.0.1:{os.getenv('PORT', '5507')}"
+    or f"http://{'127.0.0.1' if HOST in {'0.0.0.0', ''} else HOST}:{PORT}"
 ).rstrip("/")
 configured_frontend_origin = (os.getenv("FRONTEND_ORIGIN") or "").strip().rstrip("/")
 FRONTEND_ORIGIN = (
@@ -77,33 +118,58 @@ GOOGLE_REDIRECT_URI = (
     os.getenv("GOOGLE_REDIRECT_URI", "").strip()
     or f"{APP_ORIGIN}/api/auth/google/callback"
 ).rstrip("/")
+
 configured_jwt_secret = (os.getenv("SESSION_SECRET") or "").strip()
-if len(configured_jwt_secret) >= 32 and configured_jwt_secret != "generate-a-long-random-secret":
+insecure_secrets = {
+    "",
+    "generate-a-long-random-secret",
+    "change-me",
+    "secret",
+    "your-session-secret-here",
+}
+if is_production():
+    if not configured_jwt_secret or len(configured_jwt_secret) < 32 or configured_jwt_secret in insecure_secrets:
+        raise RuntimeError(
+            "CRITICAL: SESSION_SECRET is missing, too short, or set to an insecure default value in production. "
+            "Server startup aborted."
+        )
     JWT_SECRET = configured_jwt_secret
 else:
-    JWT_SECRET = secrets.token_urlsafe(48)
-    logging.getLogger(__name__).warning(
-        "SESSION_SECRET is missing or too short; temporary sessions will expire when the server restarts."
-    )
+    if len(configured_jwt_secret) >= 32 and configured_jwt_secret not in insecure_secrets:
+        JWT_SECRET = configured_jwt_secret
+    else:
+        JWT_SECRET = secrets.token_urlsafe(48)
+        logging.getLogger(__name__).warning(
+            "SESSION_SECRET is missing or too short; temporary sessions will expire when the server restarts."
+        )
 
 password_hash = PasswordHash.recommended()
 app = FastAPI(title="Gemini Chat")
-cors_origins = {
-    APP_ORIGIN,
-    "http://127.0.0.1:5507",
-}
-if FRONTEND_ORIGIN not in {"*", APP_ORIGIN}:
-    cors_origins.add(FRONTEND_ORIGIN)
+
+configured_cors = (os.getenv("CORS_ALLOWED_ORIGINS") or os.getenv("CORS_ORIGINS") or "").strip()
+cors_origins_set = set()
+if configured_cors:
+    for origin in configured_cors.split(","):
+        origin = origin.strip().rstrip("/")
+        if origin and origin != "*":
+            cors_origins_set.add(origin)
+else:
+    if FRONTEND_ORIGIN and FRONTEND_ORIGIN != "*":
+        cors_origins_set.add(FRONTEND_ORIGIN)
+    if APP_ORIGIN and APP_ORIGIN != "*" and APP_ORIGIN != FRONTEND_ORIGIN:
+        cors_origins_set.add(APP_ORIGIN)
+
+cors_origins = sorted(cors_origins_set)
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=sorted(cors_origins),
-    allow_origin_regex=r"http://127\.0\.0\.1:5507",
+    allow_origins=cors_origins,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
 
+@app.get("/health", include_in_schema=False)
 @app.get("/api/health")
 async def health():
     return {"status": "ok"}
@@ -129,13 +195,34 @@ DIST_MEDIA_TYPES = {
 @app.get("/logo.svg", include_in_schema=False)
 @app.get("/logo-192.png", include_in_schema=False)
 @app.get("/logo-512.png", include_in_schema=False)
+@app.get("/apple-touch-icon.png", include_in_schema=False)
+@app.get("/apple-touch-icon-precomposed.png", include_in_schema=False)
 @app.get("/robots.txt", include_in_schema=False)
+@app.get("/app/favicon.ico", include_in_schema=False)
+@app.get("/app/logo.svg", include_in_schema=False)
+@app.get("/app/logo-192.png", include_in_schema=False)
+@app.get("/app/logo-512.png", include_in_schema=False)
+@app.get("/app/apple-touch-icon.png", include_in_schema=False)
+@app.get("/app/apple-touch-icon-precomposed.png", include_in_schema=False)
 async def dist_root_file(request: Request):
-    """Logotip, favicon kabi dist ildizidagi fayllar (faqat fayl nomi bo'yicha)."""
+    """Logotip, favicon kabi dist yoki public ildizidagi fayllar."""
     name = Path(request.url.path).name
     target = DIST / name
-    if not target.is_file() and name == "favicon.ico" and (DIST / "logo-192.png").is_file():
-        target = DIST / "logo-192.png"  # favicon so'ralganda logotipni beramiz
+    if not target.is_file():
+        target = (FRONTEND_ROOT / "public") / name
+    if not target.is_file():
+        if name == "favicon.ico":
+            if (DIST / "logo-192.png").is_file():
+                target = DIST / "logo-192.png"
+            elif ((FRONTEND_ROOT / "public") / "logo-192.png").is_file():
+                target = (FRONTEND_ROOT / "public") / "logo-192.png"
+        elif "apple-touch-icon" in name:
+            if (DIST / "apple-touch-icon.png").is_file():
+                target = DIST / "apple-touch-icon.png"
+            elif (DIST / "logo-192.png").is_file():
+                target = DIST / "logo-192.png"
+            elif ((FRONTEND_ROOT / "public") / "logo-192.png").is_file():
+                target = (FRONTEND_ROOT / "public") / "logo-192.png"
     if not target.is_file():
         raise HTTPException(404, "Fayl topilmadi.")
     return FileResponse(target, media_type=DIST_MEDIA_TYPES.get(target.suffix, "application/octet-stream"))
@@ -393,12 +480,32 @@ def identity_kind(value: str) -> str:
 
 def channel_for(destination: str) -> str:
     """Kodni qaysi kanal orqali yuborish mumkin: 'sms', 'email' yoki 'demo'."""
-    if (os.getenv("DEV_SHOW_OTP", "false") or "").strip().lower() in {"1", "true", "yes", "on"}:
+    if dev_show_otp_enabled():
         return "demo"
     if destination.startswith("+"):
         ready = bool(os.getenv("ESKIZ_EMAIL") and os.getenv("ESKIZ_PASSWORD"))
         return "sms" if ready else "demo"
     return "email" if email_delivery_configured() else "demo"
+
+
+def dev_show_otp_enabled() -> bool:
+    if is_production():
+        return False
+    return (os.getenv("DEV_SHOW_OTP", "false") or "").strip().lower() in {
+        "1", "true", "yes", "on"
+    }
+
+
+def client_ip(request: Request | None) -> str:
+    if not request:
+        return "127.0.0.1"
+    forwarded = request.headers.get("x-forwarded-for")
+    if forwarded:
+        return forwarded.split(",")[0].strip()
+    real_ip = request.headers.get("x-real-ip")
+    if real_ip:
+        return real_ip.strip()
+    return request.client.host if request.client else "unknown"
 
 
 def otp_mode() -> str:
@@ -485,15 +592,21 @@ def create_session(user_id: int) -> str:
     return token
 
 
-def start_session(response: Response, user_id: int):
+def start_session(response: Response, user_id: int, request: Request | None = None):
     token = create_session(user_id)
-    secure_cookie = APP_ORIGIN.startswith("https://")
+    is_https = False
+    if request:
+        proto = request.headers.get("x-forwarded-proto", "").lower()
+        is_https = proto == "https" or request.url.scheme == "https"
+    if not is_https:
+        is_https = APP_ORIGIN.startswith("https://") or is_production()
+    samesite = "none" if is_https and FRONTEND_ORIGIN != APP_ORIGIN else "lax"
     response.set_cookie(
         "session",
         token,
         httponly=True,
-        secure=secure_cookie,
-        samesite="none" if secure_cookie and FRONTEND_ORIGIN != APP_ORIGIN else "lax",
+        secure=is_https,
+        samesite=samesite,
         max_age=60 * 60 * 24 * SESSION_DAYS,
         path="/",
     )
@@ -560,7 +673,7 @@ def get_smtp_config() -> tuple[str, str, str, int]:
     host = (os.getenv("SMTP_HOST") or "").strip().strip('"\'')
     user = (os.getenv("SMTP_USER") or os.getenv("SMTP_USERNAME") or "").strip().strip('"\'')
     password = (os.getenv("SMTP_PASSWORD") or os.getenv("SMTP_PASS") or "").strip().strip('"\'')
-    password = password.replace(" ", "")
+    password = re.sub(r"\s+", "", password)
     port_value = (os.getenv("SMTP_PORT") or "465").strip()
     try:
         port = int(port_value)
@@ -583,24 +696,98 @@ def email_delivery_configured() -> bool:
             (os.getenv("BREVO_API_KEY") or "").strip()
             and (os.getenv("BREVO_SENDER_EMAIL") or "").strip()
         )
-    logging.error("Email error: EMAIL_PROVIDER must be 'smtp' or 'brevo'")
+    if provider == "resend":
+        return bool((os.getenv("RESEND_API_KEY") or "").strip())
+    logging.error("Email error: EMAIL_PROVIDER must be 'smtp', 'resend', or 'brevo'")
     return False
+
+
+def safe_email_error_value(value, secrets_to_mask: tuple[str, ...]) -> str:
+    if isinstance(value, bytes):
+        value = value.decode("utf-8", errors="replace")
+    text = str(value) if value is not None else "-"
+    for secret in secrets_to_mask:
+        if secret:
+            text = text.replace(secret, "***MASKED***")
+    return text
+
+
+def log_email_error(action: str, error: Exception, secrets_to_mask: tuple[str, ...]) -> None:
+    code = getattr(error, "code", None) or getattr(error, "smtp_code", None) or getattr(error, "errno", None)
+    response = getattr(error, "response", None)
+    if response is None:
+        response = getattr(error, "smtp_error", None)
+    message = getattr(error, "message", None) or str(error)
+    logging.getLogger("uvicorn.error").error(
+        "%s failed: type=%s code=%s response=%s message=%s",
+        action,
+        type(error).__name__,
+        safe_email_error_value(code, secrets_to_mask),
+        safe_email_error_value(response, secrets_to_mask),
+        safe_email_error_value(message, secrets_to_mask),
+    )
+
+
+def smtp_log_secrets(user: str, password: str) -> tuple[str, ...]:
+    raw_password = (
+        os.getenv("SMTP_PASSWORD") or os.getenv("SMTP_PASS") or ""
+    ).strip().strip('"\'')
+    return tuple(secret for secret in (user, password, raw_password) if secret)
+
+
+def verify_smtp_connection() -> bool:
+    host, user, password, port = get_smtp_config()
+    if not (host and user and password):
+        logging.getLogger("uvicorn.error").warning(
+            "SMTP verification skipped: SMTP_HOST, SMTP_USER, or SMTP_PASSWORD is missing"
+        )
+        return False
+
+    context = ssl.create_default_context()
+    try:
+        if port == 465:
+            with smtplib.SMTP_SSL(host, port, timeout=20, context=context) as server:
+                server.login(user, password)
+        else:
+            with smtplib.SMTP(host, port, timeout=20) as server:
+                server.starttls(context=context)
+                server.login(user, password)
+        logging.getLogger("uvicorn.error").info(
+            "SMTP connection verified successfully (%s:%s)", host, port
+        )
+        return True
+    except Exception as error:
+        log_email_error("SMTP verification", error, smtp_log_secrets(user, password))
+        return False
 
 
 def send_email(address: str, code: str) -> bool:
     provider = get_email_provider()
     host, user, password, port = get_smtp_config()
-    api_key = (os.getenv("BREVO_API_KEY") or "").strip()
-    sender = (os.getenv("BREVO_SENDER_EMAIL") or "").strip()
+    brevo_api_key = (os.getenv("BREVO_API_KEY") or "").strip()
+    brevo_sender = (os.getenv("BREVO_SENDER_EMAIL") or "").strip()
+    resend_api_key = (os.getenv("RESEND_API_KEY") or "").strip()
+    resend_sender = (os.getenv("RESEND_SENDER_EMAIL") or "Navo AI <onboarding@resend.dev>").strip()
+
     if not email_delivery_configured():
         if provider == "brevo":
             logging.error("Email error: BREVO_API_KEY and BREVO_SENDER_EMAIL are required for Brevo delivery")
+        elif provider == "resend":
+            logging.error("Email error: RESEND_API_KEY is required for Resend delivery")
         elif provider == "smtp":
             logging.error("Email error: SMTP_HOST, SMTP_USER/SMTP_USERNAME, or SMTP_PASSWORD is not configured")
         return False
+
     message = EmailMessage()
     message["Subject"] = "🔐 Navo AI tasdiqlash kodi"
-    message["From"] = formataddr(("Navo AI", sender if provider == "brevo" else user))
+    sender_name = "Navo AI"
+    if provider == "brevo":
+        from_address = formataddr((sender_name, brevo_sender))
+    elif provider == "resend":
+        from_address = resend_sender if "<" in resend_sender else formataddr((sender_name, resend_sender))
+    else:
+        from_address = formataddr((sender_name, user))
+    message["From"] = from_address
     message["To"] = address
     text_body = (
         f"Navo AI tasdiqlash kodi: {code}\n"
@@ -635,13 +822,28 @@ def send_email(address: str, code: str) -> bool:
 </html>
 """
     message.add_alternative(html_body, subtype="html")
+    secrets_to_mask = (*smtp_log_secrets(user, password), brevo_api_key, brevo_sender, resend_api_key, resend_sender, address, code)
     try:
-        if provider == "brevo":
+        if provider == "resend":
+            response = httpx.post(
+                "https://api.resend.com/emails",
+                headers={"Authorization": f"Bearer {resend_api_key}", "Content-Type": "application/json"},
+                json={
+                    "from": from_address,
+                    "to": [address],
+                    "subject": str(message["Subject"]),
+                    "text": text_body,
+                    "html": html_body,
+                },
+                timeout=20,
+            )
+            response.raise_for_status()
+        elif provider == "brevo":
             response = httpx.post(
                 "https://api.brevo.com/v3/smtp/email",
-                headers={"accept": "application/json", "api-key": api_key},
+                headers={"accept": "application/json", "api-key": brevo_api_key},
                 json={
-                    "sender": {"name": "Navo AI", "email": sender},
+                    "sender": {"name": "Navo AI", "email": brevo_sender},
                     "to": [{"email": address}],
                     "subject": str(message["Subject"]),
                     "textContent": text_body,
@@ -663,12 +865,32 @@ def send_email(address: str, code: str) -> bool:
                 server.send_message(message)
         return True
     except Exception as error:
-        safe_message = str(error)
-        for secret in (user, password, api_key, sender, address):
-            if secret:
-                safe_message = safe_message.replace(secret, "***MASKED***")
-        logging.error("Email error (%s): %s", type(error).__name__, safe_message)
+        log_email_error(
+            "Email delivery",
+            error,
+            secrets_to_mask,
+        )
         return False
+
+
+@app.on_event("startup")
+async def verify_email_transport_on_startup():
+    provider = get_email_provider()
+    if provider == "smtp":
+        await asyncio.to_thread(verify_smtp_connection)
+    elif provider in {"resend", "brevo"}:
+        if email_delivery_configured():
+            logging.getLogger("uvicorn.error").info(
+                "Email transport verified: EMAIL_PROVIDER is %s (HTTP API configured)", provider
+            )
+        else:
+            logging.getLogger("uvicorn.error").warning(
+                "Email transport warning: EMAIL_PROVIDER is %s but required API credentials are missing", provider
+            )
+    else:
+        logging.getLogger("uvicorn.error").info(
+            "SMTP verification skipped: EMAIL_PROVIDER is %s", provider
+        )
 
 
 def drop_code(destination: str):
@@ -721,6 +943,10 @@ async def issue_code(
     except (HTTPException, httpx.HTTPError, OSError, smtplib.SMTPException):
         drop_code(destination)
         raise
+    if dev_show_otp_enabled():
+        logging.getLogger("uvicorn.error").warning(
+            "DEV_SHOW_OTP=true: %s OTP code: %s", purpose, code
+        )
     return code, True
 
 
@@ -826,20 +1052,29 @@ async def me(session: str | None = Cookie(default=None)):
 
 
 @app.post("/api/auth/logout")
-async def logout(response: Response, session: str | None = Cookie(default=None)):
+async def logout(response: Response, request: Request = None, session: str | None = Cookie(default=None)):
     if session:
         with db() as connection:
             connection.execute(
                 "DELETE FROM sessions WHERE token_hash=?", (hashlib.sha256(session.encode()).hexdigest(),)
             )
-    response.delete_cookie("session")
+    proto = request.headers.get("x-forwarded-proto", "").lower() if request else ""
+    is_https = proto == "https" or (request and request.url.scheme == "https") or APP_ORIGIN.startswith("https://") or is_production()
+    samesite = "none" if is_https and FRONTEND_ORIGIN != APP_ORIGIN else "lax"
+    response.delete_cookie(
+        "session",
+        path="/",
+        httponly=True,
+        secure=is_https,
+        samesite=samesite,
+    )
     return {"message": "Siz hisobdan chiqdingiz."}
 
 
 # --- Ro'yxatdan o'tish va kirish --------------------------------------------
 
 @app.post("/api/auth/register")
-async def register(payload: RegisterInput):
+async def register(payload: RegisterInput, request: Request = None):
     destination = normalize(payload.email or payload.phone or "")
     if not destination:
         raise HTTPException(400, "Email yoki telefon raqamini kiriting.")
@@ -849,6 +1084,12 @@ async def register(payload: RegisterInput):
         5,
         900,
         "Bu manzil uchun juda ko‘p urinish. 15 daqiqadan so‘ng qayta urinib ko‘ring.",
+    )
+    rate_limit(
+        f"ip:register:{client_ip(request)}",
+        15,
+        900,
+        "Juda ko‘p ro‘yxatdan o‘tish urinishi. 15 daqiqadan so‘ng qayta urinib ko‘ring.",
     )
     existing = find_user(destination)
     if existing and existing["verified"]:
@@ -898,16 +1139,17 @@ async def register(payload: RegisterInput):
         "destination": destination,
         "channel": channel,
         "email_sent": email_sent if channel == "email" else None,
-        "demo_code": code if channel == "demo" else None,
+        "demo_code": code if (channel == "demo" and not is_production() and dev_show_otp_enabled()) else None,
     }
 
 
 @app.post("/api/auth/verify")
 @app.post("/api/auth/verify-otp")
-async def verify_code(payload: CodeInput, response: Response):
+async def verify_code(payload: CodeInput, response: Response, request: Request = None):
     destination = normalize(payload.destination)
     identity_kind(destination)
     rate_limit(f"verify:{destination}", 20, 900)
+    rate_limit(f"ip:verify:{client_ip(request)}", 50, 900)
     google_pending: tuple[str, str | None] | None = None
     if payload.purpose == "google":
         with db() as connection:
@@ -955,7 +1197,7 @@ async def verify_code(payload: CodeInput, response: Response):
                 )
             connection.execute("DELETE FROM pending_google_auth WHERE email=?", (destination,))
             user = connection.execute("SELECT * FROM users WHERE id=?", (user_id,)).fetchone()
-        access_token = start_session(response, user["id"])
+        access_token = start_session(response, user["id"], request)
         return {
             "message": "Google hisobi tasdiqlandi.",
             "user": public_user(user),
@@ -968,7 +1210,7 @@ async def verify_code(payload: CodeInput, response: Response):
     with db() as connection:
         connection.execute("UPDATE users SET verified=1 WHERE id=?", (user["id"],))
     user = find_user(destination)
-    access_token = start_session(response, user["id"])
+    access_token = start_session(response, user["id"], request)
     message = "Hisob tasdiqlandi." if payload.purpose == "register" else "Kod tasdiqlandi."
     return {
         "message": message,
@@ -979,12 +1221,15 @@ async def verify_code(payload: CodeInput, response: Response):
 
 
 @app.post("/api/auth/login")
-async def login(payload: LoginInput, response: Response):
+async def login(payload: LoginInput, response: Response, request: Request = None):
     identity = normalize(payload.identity)
     if not identity:
         raise HTTPException(400, "Email yoki telefon raqamini kiriting.")
     rate_limit(
         f"login:{identity}", 10, 900, "Login urinishlari ko‘payib ketdi. 15 daqiqadan so‘ng qayta urinib ko‘ring."
+    )
+    rate_limit(
+        f"ip:login:{client_ip(request)}", 30, 900, "Bu qurilmadan juda ko‘p login urinishi. 15 daqiqadan so‘ng qayta urinib ko‘ring."
     )
     user = find_user(identity)
     valid_password = False
@@ -1033,11 +1278,12 @@ async def login(payload: LoginInput, response: Response):
 
 
 @app.post("/api/auth/verify-login-otp")
-async def verify_login_otp(payload: LoginOtpInput, response: Response):
+async def verify_login_otp(payload: LoginOtpInput, response: Response, request: Request = None):
     email = normalize(payload.email)
     if identity_kind(email) != "email":
         raise HTTPException(422, "Email manzilni to‘g‘ri kiriting.")
     rate_limit(f"verify-login:{email}", 20, 900)
+    rate_limit(f"ip:verify-login:{client_ip(request)}", 50, 900)
     with db() as connection:
         pending = connection.execute(
             "SELECT pending_login_auth.user_id, users.* FROM pending_login_auth "
@@ -1050,7 +1296,7 @@ async def verify_login_otp(payload: LoginOtpInput, response: Response):
     check_code(email, payload.code, "login")
     with db() as connection:
         connection.execute("DELETE FROM pending_login_auth WHERE email=?", (email,))
-    access_token = start_session(response, pending["user_id"])
+    access_token = start_session(response, pending["user_id"], request)
     user = find_user(email)
     return {
         "message": "Kirish muvaffaqiyatli.",
@@ -1065,13 +1311,16 @@ async def verify_login_otp(payload: LoginOtpInput, response: Response):
 # --- Parolni tiklash ---------------------------------------------------------
 
 @app.post("/api/auth/forgot")
-async def forgot(payload: ForgotInput):
+async def forgot(payload: ForgotInput, request: Request = None):
     destination = normalize(payload.destination)
     identity_kind(destination)
     if not find_user(destination):
         raise HTTPException(404, "Bunday hisob topilmadi. Avval ro‘yxatdan o‘ting.")
     rate_limit(
         f"forgot:{destination}", 5, 900, "Kod juda ko‘p marta so‘raldi. 15 daqiqadan so‘ng qayta urinib ko‘ring."
+    )
+    rate_limit(
+        f"ip:forgot:{client_ip(request)}", 15, 900, "Juda ko‘p tiklash so‘rovi. 15 daqiqadan so‘ng qayta urinib ko‘ring."
     )
     code, email_sent = await issue_code(destination, "reset")
     channel = channel_for(destination)
@@ -1091,13 +1340,13 @@ async def forgot(payload: ForgotInput):
         "destination": destination,
         "channel": channel,
         "email_sent": email_sent if channel == "email" else None,
-        "demo_code": code if channel == "demo" else None,
+        "demo_code": code if (channel == "demo" and not is_production() and dev_show_otp_enabled()) else None,
     }
 
 
 @app.post("/api/auth/resend")
 @app.post("/api/auth/resend-otp")
-async def resend(payload: ResendInput):
+async def resend(payload: ResendInput, request: Request = None):
     destination = normalize(payload.destination)
     kind = identity_kind(destination)
     purpose = payload.purpose
@@ -1132,6 +1381,9 @@ async def resend(payload: ResendInput):
     rate_limit(
         f"resend:{destination}", 5, 900, "Kod juda ko‘p marta so‘raldi. 15 daqiqadan so‘ng qayta urinib ko‘ring."
     )
+    rate_limit(
+        f"ip:resend:{client_ip(request)}", 15, 900, "Juda ko‘p kod so‘rovi. 15 daqiqadan so‘ng qayta urinib ko‘ring."
+    )
     code, email_sent = await issue_code(
         destination, purpose, require_email=purpose in {"google", "login"}
     )
@@ -1164,15 +1416,16 @@ async def resend(payload: ResendInput):
         "destination": destination,
         "channel": channel,
         "email_sent": email_sent if channel == "email" else None,
-        "demo_code": code if channel == "demo" else None,
+        "demo_code": code if (channel == "demo" and not is_production() and dev_show_otp_enabled()) else None,
     }
 
 
 @app.post("/api/auth/reset")
-async def reset(payload: ResetInput):
+async def reset(payload: ResetInput, request: Request = None):
     destination = normalize(payload.destination)
     identity_kind(destination)
     rate_limit(f"reset:{destination}", 10, 900)
+    rate_limit(f"ip:reset:{client_ip(request)}", 25, 900)
     user = find_user(destination)
     if not user:
         raise HTTPException(404, "Bunday hisob topilmadi.")

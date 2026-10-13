@@ -7,9 +7,20 @@
     <meta name="description" content="Navo AI — o‘zbek tilidagi aqlli yordamchingiz." />
     <link rel="icon" type="image/svg+xml" href="/logo.svg" />
     <link rel="icon" type="image/png" sizes="192x192" href="/logo-192.png" />
+    <link rel="icon" type="image/png" sizes="512x512" href="/logo-512.png" />
+    <link rel="shortcut icon" href="/favicon.ico" />
+    <link rel="apple-touch-icon" sizes="180x180" href="/logo-192.png" />
     <link rel="apple-touch-icon" href="/logo-192.png" />
     <link rel="mask-icon" href="/logo.svg" color="#7b6bee" />
-    <link rel="manifest" href="/manifest.webmanifest" />
+    <script>
+      (() => {
+        const localHost = window.location.hostname === "127.0.0.1"
+          || window.location.hostname === "localhost";
+        if (localHost && window.location.port !== "5507") {
+          window.location.replace("http://127.0.0.1:5507" + (window.location.pathname.includes("/app") ? "/app/" : "/"));
+        }
+      })();
+    </script>
     <title>Navo AI — fikringizga yo‘l oching</title>
   </head>
   <body>

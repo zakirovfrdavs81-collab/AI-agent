@@ -1,0 +1,37 @@
+version: "3.8"
+
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: navo-ai:latest
+    container_name: navo_ai_service
+    restart: unless-stopped
+    ports:
+      - "${PORT:-5507}:${PORT:-5507}"
+    env_file:
+      - .env
+    environment:
+      - HOST=0.0.0.0
+      - PORT=${PORT:-5507}
+      - ENVIRONMENT=production
+      - FORWARDED_ALLOW_IPS=*
+    volumes:
+      # Agar SQLite ishlatilsa, ma'lumotlar yo'qolmasligi uchun volume:
+      - navo_db_data:/app/backend/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://127.0.0.1:${PORT:-5507}/health || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "20m"
+        max-file: "5"
+
+volumes:
+  navo_db_data:
+    driver: local

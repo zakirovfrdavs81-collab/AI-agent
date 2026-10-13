@@ -9,11 +9,14 @@ import { API_ORIGIN } from "../../js/config.js";
  */
 
 export function init({ reduced, coarse }) {
-  magnetic({ reduced, coarse });
-  tiltCards({ reduced, coarse });
+  const cleanups = [
+    magnetic({ reduced, coarse }),
+    tiltCards({ reduced, coarse }),
+  ].filter(Boolean);
   gallery({ reduced, coarse });
   marquee();
   appLinks();
+  return () => cleanups.forEach((cleanup) => cleanup());
 }
 
 /** Tugmalar kursorga qarab tortiladi (magnit effekt). */
@@ -28,10 +31,11 @@ function magnetic({ reduced, coarse }) {
     y: 0,
     targetX: 0,
     targetY: 0,
-    pull: Number(element.dataset.magnetic) || 0.26,
   }));
+  let frame = 0;
 
   const onMove = (event) => {
+    if (event.pointerType && event.pointerType !== "mouse") return;
     items.forEach((item) => {
       const box = item.element.getBoundingClientRect();
       if (!box.width) return;
@@ -44,29 +48,63 @@ function magnetic({ reduced, coarse }) {
         item.targetY = 0;
         return;
       }
-      item.targetX = (event.clientX - centerX) * item.pull;
-      item.targetY = (event.clientY - centerY) * item.pull;
+      const pull = Number(item.element.dataset.magnetic) || 0.26;
+      item.targetX = Math.max(-4, Math.min(4, (event.clientX - centerX) * pull));
+      item.targetY = Math.max(-4, Math.min(4, (event.clientY - centerY) * pull));
     });
+    schedule();
   };
 
-  const loop = () => {
+  const reset = () => {
+    items.forEach((item) => {
+      item.targetX = 0;
+      item.targetY = 0;
+    });
+    schedule();
+  };
+
+  const animate = () => {
+    frame = 0;
+    let moving = false;
     items.forEach((item) => {
       item.x += (item.targetX - item.x) * 0.16;
       item.y += (item.targetY - item.y) * 0.16;
-      item.element.style.transform = `translate3d(${item.x.toFixed(2)}px, ${item.y.toFixed(2)}px, 0)`;
+      item.element.style.setProperty("--magnet-x", `${item.x.toFixed(2)}px`);
+      item.element.style.setProperty("--magnet-y", `${item.y.toFixed(2)}px`);
+      if (Math.abs(item.targetX - item.x) > 0.04 || Math.abs(item.targetY - item.y) > 0.04) moving = true;
     });
-    requestAnimationFrame(loop);
+    if (moving) frame = requestAnimationFrame(animate);
+    else {
+      items.forEach(({ element }) => {
+        element.style.removeProperty("--magnet-x");
+        element.style.removeProperty("--magnet-y");
+      });
+    }
+  };
+
+  const schedule = () => {
+    if (!frame) frame = requestAnimationFrame(animate);
   };
 
   window.addEventListener("pointermove", onMove, { passive: true });
-  loop();
+  window.addEventListener("pointerleave", reset);
+  return () => {
+    window.removeEventListener("pointermove", onMove);
+    window.removeEventListener("pointerleave", reset);
+    if (frame) cancelAnimationFrame(frame);
+    items.forEach(({ element }) => {
+      element.style.removeProperty("--magnet-x");
+      element.style.removeProperty("--magnet-y");
+    });
+  };
 }
 
 /** Kartalar kursor ostida 3D burchak oladi (tilt) + yorug'lik dog'i. */
-function tiltCards({ reduced }) {
-  if (reduced) return;
-  document.querySelectorAll("[data-tilt]").forEach((card) => {
-    const strength = Number(card.dataset.tilt) || 8;
+function tiltCards({ reduced, coarse }) {
+  if (reduced || coarse) return;
+  const cleanups = [];
+  document.querySelectorAll(".tilt, [data-tilt], [data-magnetic]").forEach((card) => {
+    const strength = Number(card.dataset.tilt) || (card.matches(".btn") ? 3 : 8);
 
     const onMove = (event) => {
       if (event.pointerType && event.pointerType !== "mouse") return;
@@ -83,20 +121,33 @@ function tiltCards({ reduced }) {
       card.style.setProperty("--my", `${(py * 100).toFixed(2)}%`);
       card.style.transform =
         `perspective(950px) rotateY(${((px - 0.5) * strength * 2).toFixed(2)}deg) ` +
-        `rotateX(${(-(py - 0.5) * strength * 2).toFixed(2)}deg) translateY(-6px)`;
+        `rotateX(${(-(py - 0.5) * strength * 2).toFixed(2)}deg)` +
+        (card.matches(".btn") ? "" : " translateY(-4px)");
     };
 
     const reset = () => {
       card.style.transform = "";
     };
 
-    card.addEventListener("pointerenter", () => card.classList.add("is-tilting"));
-    card.addEventListener("pointermove", onMove);
-    card.addEventListener("pointerleave", () => {
+    const onEnter = () => card.classList.add("is-tilting");
+    const onLeave = () => {
       card.classList.remove("is-tilting");
       reset();
+    };
+    card.addEventListener("pointerenter", onEnter);
+    card.addEventListener("pointermove", onMove);
+    card.addEventListener("pointerleave", onLeave);
+    cleanups.push(() => {
+      card.removeEventListener("pointerenter", onEnter);
+      card.removeEventListener("pointermove", onMove);
+      card.removeEventListener("pointerleave", onLeave);
+      card.classList.remove("is-tilting");
+      reset();
+      card.style.removeProperty("--mx");
+      card.style.removeProperty("--my");
     });
   });
+  return () => cleanups.forEach((cleanup) => cleanup());
 }
 
 /** Gorizontal drag galereya: tortish + inersiya, tugmalar va klaviatura bilan boshqarish. */
@@ -207,15 +258,12 @@ function marquee() {
   });
 }
 
-/** "Navo AI'ni ochish" havolalarini joriy muhitga moslab ulaydi. */
+/** "Navo AI'ni ochish" va "Ilovani ochish" havolalarini 5507 dagi /app/ ga xatolarsiz olib boradigan qilish */
 function appLinks() {
-  const isLocalHost = window.location.hostname === "127.0.0.1"
-    || window.location.hostname === "localhost";
-  const target = isLocalHost && window.location.port !== "5507"
-    ? "http://127.0.0.1:5507/app/"
-    : new URL("/app/", API_ORIGIN || window.location.origin).href;
+  const isLocal = window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost";
+  const target = (isLocal && window.location.port !== "5507") ? "http://127.0.0.1:5507/app/" : "/app/";
   document.querySelectorAll("[data-app-link]").forEach((link) => link.setAttribute("href", target));
   document.querySelectorAll("[data-api-origin]").forEach((label) => {
-    label.textContent = new URL(API_ORIGIN).host;
+    label.textContent = isLocal ? "127.0.0.1:5507" : window.location.host;
   });
 }

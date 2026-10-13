@@ -151,7 +151,8 @@ html.lenis, html.lenis body { height: auto; }
   cursor: pointer;
   overflow: hidden;
   isolation: isolate;
-  transition: transform .45s var(--ease-out), border-color .4s ease, color .4s ease;
+  transform-style: preserve-3d;
+  transition: transform .45s var(--ease-out), scale .2s var(--ease-out), border-color .4s ease, color .4s ease, box-shadow .2s ease;
 }
 
 .btn::after {
@@ -165,7 +166,8 @@ html.lenis, html.lenis body { height: auto; }
 }
 
 .btn:hover::after { transform: translateY(0); }
-.btn:hover { border-color: transparent; color: #0a0b12; }
+.btn:hover { scale: 1.025; border-color: transparent; color: #0a0b12; box-shadow: 0 0 22px rgba(123, 107, 238, .2); }
+.btn:active { scale: .99; }
 .btn .btn-icon { transition: transform .45s var(--ease-out); }
 .btn:hover .btn-icon { transform: translateX(4px); }
 
@@ -178,7 +180,21 @@ html.lenis, html.lenis body { height: auto; }
 .btn-primary::after { background: linear-gradient(105deg, #fff, #dfe9ff); }
 .btn-ghost { background: rgba(255, 255, 255, .025); }
 
-[data-magnetic] { will-change: transform; }
+[data-magnetic] {
+  translate: var(--magnet-x, 0px) var(--magnet-y, 0px);
+  will-change: translate;
+}
+
+.btn.is-tilting {
+  background-image: radial-gradient(120px circle at var(--mx, 50%) var(--my, 50%), rgba(255, 255, 255, .2), transparent 72%);
+  transition: scale .2s var(--ease-out), border-color .4s ease, color .4s ease, box-shadow .2s ease;
+}
+
+.btn-primary.is-tilting {
+  background-image:
+    radial-gradient(120px circle at var(--mx, 50%) var(--my, 50%), rgba(255, 255, 255, .3), transparent 72%),
+    linear-gradient(105deg, var(--violet), var(--mint));
+}
 
 /* Tilt kartalar */
 .tilt {
@@ -211,6 +227,8 @@ html.lenis, html.lenis body { height: auto; }
   border-radius: 13px;
   background: linear-gradient(150deg, rgba(169, 142, 255, .24), rgba(140, 228, 206, .1));
   color: #f2ecff;
+  transform-style: preserve-3d;
+  backface-visibility: hidden;
 }
 
 /* Galereya (drag) */
@@ -268,75 +286,7 @@ html.lenis, html.lenis body { height: auto; }
 .nav-link:hover, .nav-link.is-active { color: var(--text); }
 .nav-link:hover::after, .nav-link.is-active::after { transform: scaleX(1); }
 
-/* --- 4. Maxsus kursor ------------------------------------------------------- */
-
-.cursor-dot, .cursor-ring {
-  position: fixed;
-  top: 0; left: 0;
-  z-index: 90;
-  pointer-events: none;
-  border-radius: 50%;
-  opacity: 0;
-  will-change: transform;
-}
-
-.cursor-dot { width: 7px; height: 7px; margin: -3.5px 0 0 -3.5px; background: var(--text); }
-
-.cursor-ring {
-  display: grid;
-  place-items: center;
-  width: 42px; height: 42px;
-  margin: -21px 0 0 -21px;
-  border: 1px solid rgba(234, 232, 245, .55);
-  mix-blend-mode: difference;
-  transition: width .35s var(--ease-out), height .35s var(--ease-out), margin .35s var(--ease-out),
-              background .35s ease, border-color .35s ease;
-}
-
-.cursor-label {
-  color: #0a0b12;
-  font-size: .58rem;
-  font-weight: 700;
-  letter-spacing: .12em;
-  text-transform: uppercase;
-  white-space: nowrap;
-  opacity: 0;
-  transform: scale(.72);
-  transition: opacity .3s ease, transform .35s var(--ease-out);
-}
-
-/* Kursor faqat sichqonchasi bor (aniq) qurilmalarda ko'rinadi va ishlaydi. */
-@media (hover: none), (pointer: coarse) {
-  .cursor-dot, .cursor-ring, .cursor-trail { display: none !important; }
-}
-
-@media (hover: hover) and (pointer: fine) {
-  html.has-cursor .cursor-dot, html.has-cursor .cursor-ring { opacity: 1; }
-  html.has-cursor, html.has-cursor a, html.has-cursor button, html.has-cursor [data-cursor] { cursor: none; }
-}
-
-.cursor-ring.is-active {
-  width: 94px; height: 94px;
-  margin: -47px 0 0 -47px;
-  border-color: transparent;
-  background: rgba(233, 230, 250, .93);
-}
-
-.cursor-ring.is-active .cursor-label { opacity: 1; transform: scale(1); }
-.cursor-ring.is-view { width: 76px; height: 76px; margin: -38px 0 0 -38px; }
-
-.cursor-trail {
-  position: fixed;
-  inset: 0;
-  z-index: 85;
-  pointer-events: none;
-  opacity: 0;
-  transition: opacity .4s ease;
-}
-
-html.has-cursor .cursor-trail { opacity: .9; }
-
-/* --- 5. Kirish animatsiyasi va reveal holatlari ----------------------------- */
+/* --- 4. Kirish animatsiyasi va reveal holatlari ----------------------------- */
 
 .preloader {
   position: fixed;
@@ -359,14 +309,25 @@ html.has-cursor .cursor-trail { opacity: .9; }
   100% { transform: translateX(250%); }
 }
 
-/* JS bor bo'lsa (html.js) reveal elementlari dastlab yashirin turadi */
-.js [data-reveal] { opacity: 0; transform: translateY(30px); }
+/* Reveal boshlang'ich holatlari: GSAP uchun ham, CSS fallback uchun ham. */
+.js [data-reveal] {
+  opacity: 0;
+  transform: translate3d(var(--reveal-x, 0px), var(--reveal-y, 36px), 0) scale(.96) rotate(var(--reveal-rotation, 0deg));
+}
+
+.js [data-reveal-direction="left"] { --reveal-x: -36px; --reveal-y: 12px; --reveal-rotation: -1deg; }
+.js [data-reveal-direction="right"] { --reveal-x: 36px; --reveal-y: 12px; --reveal-rotation: 1deg; }
+.js [data-reveal-direction="up"] { --reveal-y: 42px; }
+
+.js [data-reveal][data-tilt] { transform: none; }
 
 .js [data-reveal].is-visible {
   opacity: 1;
   transform: none;
   transition: opacity .95s var(--ease-out), transform 1.05s var(--ease-out);
 }
+
+html.js.has-gsap [data-reveal].is-visible { transition: none; }
 
 /* Bo'laklarga ajratilgan sarlavhalar (kinetic typography) */
 [data-split] { line-height: 1.12; }
@@ -377,7 +338,7 @@ html.fallback [data-reveal] { opacity: 1 !important; transform: none !important;
 html.fallback .preloader { display: none; }
 
 /* Tilt paytida real vaqt kuzatuvi uchun o'tishni o'chiramiz */
-.tilt.is-tilting { transition: box-shadow .5s ease; }
+html.js .tilt.is-tilting { transition: box-shadow .5s ease; }
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {
@@ -386,14 +347,10 @@ html.fallback .preloader { display: none; }
     transition-duration: .001ms !important;
   }
   .js [data-reveal] { opacity: 1; transform: none; }
-  .cursor-dot, .cursor-ring, .cursor-trail { display: none; }
   .grain { display: none; }
 }
 
 @media (max-width: 900px) {
   .orb { filter: blur(70px); opacity: .38; }
   .grain { opacity: .13; }
-  .cursor-ring { display: none; }
 }
-
-

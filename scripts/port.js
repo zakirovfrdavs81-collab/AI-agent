@@ -6,22 +6,35 @@ const execFileAsync = promisify(execFile);
 
 export async function getPortListeners(port, host = "127.0.0.1") {
   if (process.platform === "win32") {
-    const { stdout } = await execFileAsync(
-      "netstat.exe",
-      ["-ano", "-p", "tcp"],
-      { windowsHide: true },
-    );
-    return [...new Set(stdout.split(/\r?\n/).flatMap((line) => {
-      const fields = line.trim().split(/\s+/);
-      if (
-        fields[0] !== "TCP"
-        || fields[3] !== "LISTENING"
-        || fields[1].slice(fields[1].lastIndexOf(":") + 1) !== String(port)
-      ) {
-        return [];
-      }
-      return [Number(fields[4])];
-    }))];
+    try {
+      const { stdout } = await execFileAsync(
+        "netstat.exe",
+        ["-ano", "-p", "tcp"],
+        { windowsHide: true },
+      );
+      return [...new Set(stdout.split(/\r?\n/).flatMap((line) => {
+        const fields = line.trim().split(/\s+/);
+        if (
+          fields[0] !== "TCP"
+          || fields[3] !== "LISTENING"
+          || fields[1].slice(fields[1].lastIndexOf(":") + 1) !== String(port)
+        ) {
+          return [];
+        }
+        const pid = Number(fields[4]);
+        return pid ? [pid] : [];
+      }))];
+    } catch {
+      // fallback to net.createServer check
+    }
+  } else {
+    try {
+      const { stdout } = await execFileAsync("lsof", ["-ti", `:${port}`]);
+      const pids = stdout.trim().split(/\s+/).map(Number).filter(Boolean);
+      if (pids.length > 0) return [...new Set(pids)];
+    } catch {
+      // fallback
+    }
   }
 
   const taken = await new Promise((resolve, reject) => {

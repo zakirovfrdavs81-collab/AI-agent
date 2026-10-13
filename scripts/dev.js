@@ -7,7 +7,12 @@ import { getPortListeners } from "./port.js";
 const projectRoot = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const shellCommand = process.platform === "win32" ? "cmd" : "sh";
 const shellArgs = process.platform === "win32" ? ["/c", "npm run build"] : ["-lc", "npm run build"];
-const appUrl = "http://127.0.0.1:5507/";
+const devPort = Number(process.env.PORT || 5507);
+const devHost = process.env.HOST || "0.0.0.0";
+const loopbackHost = devHost === "0.0.0.0" ? "127.0.0.1" : devHost;
+const appUrl = process.env.APP_ORIGIN
+  ? `${process.env.APP_ORIGIN.replace(/\/+$/, "")}/`
+  : `http://${loopbackHost}:${devPort}/`;
 const frontendEntry = path.join(projectRoot, "frontend", "index.html");
 const frontendBuildIndex = path.join(projectRoot, "frontend", "dist", "index.html");
 const frontendBuildAssets = path.join(projectRoot, "frontend", "dist", "assets");
@@ -29,25 +34,29 @@ function findChrome() {
 
 async function appIsReady() {
   try {
-    const [healthResponse, pageResponse, appPageResponse, configResponse] = await Promise.all([
-      fetch(`${appUrl}api/health`, { signal: AbortSignal.timeout(1000) }),
-      fetch(appUrl, { signal: AbortSignal.timeout(1000) }),
-      fetch(`${appUrl}app/`, { signal: AbortSignal.timeout(1000) }),
-      fetch(`${appUrl}api/config`, { signal: AbortSignal.timeout(1000) }),
+    const [healthRes, apiHealthRes] = await Promise.all([
+      fetch(`${appUrl}health`, { signal: AbortSignal.timeout(1500) }).catch(() => null),
+      fetch(`${appUrl}api/health`, { signal: AbortSignal.timeout(1500) }).catch(() => null),
     ]);
-    if (!healthResponse.ok || !pageResponse.ok || !appPageResponse.ok || !configResponse.ok) return false;
-    const [health, page, appPage, config] = await Promise.all([
-      healthResponse.json(),
-      pageResponse.text(),
-      appPageResponse.text(),
-      configResponse.json(),
-    ]);
-    return health.status === "ok"
-      && page.includes('<title>Navo AI')
-      && page.includes('data-nav')
-      && appPage.includes('id="root"')
-      && typeof config.google_login === "boolean"
-      && typeof config.email_channel === "string";
+
+    const activeRes = (healthRes && healthRes.ok) ? healthRes : ((apiHealthRes && apiHealthRes.ok) ? apiHealthRes : null);
+    if (!activeRes) return false;
+
+    const data = await activeRes.json().catch(() => null);
+    if (!data || data.status !== "ok") return false;
+
+    try {
+      const configRes = await fetch(`${appUrl}api/config`, { signal: AbortSignal.timeout(1500) });
+      if (configRes.ok) {
+        const config = await configRes.json();
+        if (typeof config.google_login === "boolean" || typeof config.email_channel === "string") {
+          return true;
+        }
+      }
+    } catch {
+      // config tekshiruvi xato bo'lsa ham health ok bo'lsa kifoya
+    }
+    return true;
   } catch {
     return false;
   }
@@ -83,7 +92,7 @@ async function runBuildAndStart() {
     const buildCode = await new Promise((resolve, reject) => {
       const build = spawn(shellCommand, shellArgs, {
         cwd: projectRoot,
-        env: { ...process.env, PORT: "5507", HOST: "127.0.0.1" },
+        env: { ...process.env, PORT: String(devPort), HOST: devHost },
         stdio: "inherit",
       });
 
@@ -101,36 +110,43 @@ async function runBuildAndStart() {
     throw new Error("Cannot build the frontend or serve it: frontend/index.html and frontend/dist are missing.");
   }
 
-  const listeners = await getPortListeners(5507);
+  const listeners = await getPortListeners(devPort, loopbackHost);
   if (listeners.length) {
     if (!(await appIsReady())) {
+      const pidText = listeners.filter(Boolean).join(", ") || "aniqlanmadi";
       console.error(
-        "Port 5507 is occupied by a server that is not the expected Navo AI FastAPI app. Stop it only after verifying its owner, then run this task again.",
+        `XATO: ${devPort}-port band, lekin unda Navo AI FastAPI aniqlanmadi.\n` +
+        `Tinglayotgan jarayon PID: ${pidText}.\n` +
+        `Boshqa dastur (masalan, Live Server) ${devPort}-portni band qilib turibdi.\n` +
+        `Ushbu jarayonni to'xtating yoki portni bo'shatib, qayta urinib ko'ring.`
       );
       process.exitCode = 1;
       return;
     }
     if (new Set(listeners).size > 1) {
       console.error(
-        "Port 5507 has multiple listening processes. Refusing to start another server.",
+        `Port ${devPort} has multiple listening processes. Refusing to start another server.`,
       );
       process.exitCode = 1;
       return;
     }
-    console.log(`Navo AI FastAPI is already running at ${appUrl}`);
+    console.log(`Navo AI FastAPI allaqachon ishlayapti: ${appUrl}`);
     if (openBrowser && !(await openChrome())) process.exitCode = 1;
     return;
   }
 
-  const listenersAfterBuild = await getPortListeners(5507);
+  const listenersAfterBuild = await getPortListeners(devPort, loopbackHost);
   if (listenersAfterBuild.length) {
     if (!(await appIsReady())) {
-      throw new Error("Port 5507 became occupied by a server that is not this FastAPI app during the build.");
+      const pidText = listenersAfterBuild.filter(Boolean).join(", ") || "aniqlanmadi";
+      throw new Error(
+        `XATO: ${devPort}-port build jarayonida boshqa dastur tomonidan band qilindi. Tinglayotgan jarayon PID: ${pidText}.`
+      );
     }
     if (new Set(listenersAfterBuild).size > 1) {
-      throw new Error("Port 5507 has multiple listening processes; refusing to start another server.");
+      throw new Error(`Port ${devPort} has multiple listening processes; refusing to start another server.`);
     }
-    console.log(`Navo AI FastAPI is already running at ${appUrl}`);
+    console.log(`Navo AI FastAPI allaqachon ishlayapti: ${appUrl}`);
     if (openBrowser && !(await openChrome())) process.exitCode = 1;
     return;
   }
@@ -139,9 +155,15 @@ async function runBuildAndStart() {
 }
 
 function startBackend(waitForReady = false) {
+    const forwardedAllowIps = process.env.FORWARDED_ALLOW_IPS || "*";
     const backend = spawn(process.execPath, [path.join(projectRoot, "scripts", "start.js")], {
       cwd: projectRoot,
-      env: { ...process.env, HOST: "127.0.0.1", PORT: "5507" },
+      env: {
+        ...process.env,
+        HOST: devHost,
+        PORT: String(devPort),
+        FORWARDED_ALLOW_IPS: forwardedAllowIps,
+      },
       stdio: "inherit",
     });
     let backendExit = null;

@@ -1,8 +1,14 @@
 {
-  "liveServer.settings.port": 5507,
+  "liveServer.settings.port": 5508,
   "liveServer.settings.root": "/frontend",
   "liveServer.settings.host": "127.0.0.1",
   "liveServer.settings.CustomBrowser": "chrome",
   "liveServer.settings.NoBrowser": false,
-  "liveServer.settings.showOnStatusbar": true
+  "liveServer.settings.showOnStatusbar": true,
+  "liveServer.settings.file": "showcase/index.html",
+  "liveServer.settings.proxy": {
+    "enable": true,
+    "baseUri": "/",
+    "proxyUri": "http://127.0.0.1:5507"
+  }
 }

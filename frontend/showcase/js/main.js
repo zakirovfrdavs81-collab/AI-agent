@@ -8,7 +8,6 @@
 const LOADERS = {
   scroll: () => import("./smooth-scroll.js"),
   reveal: () => import("./reveal.js"),
-  cursor: () => import("./cursor.js"),
   scene: () => import("./scene.js"),
   interactions: () => import("./interactions.js"),
 };
@@ -31,6 +30,19 @@ async function boot() {
       console.warn(`[showcase] «${name}» moduli ishga tushmadi:`, error);
     }
   }
+
+  if (results.scroll?.gsap && results.scroll?.ScrollTrigger) {
+    document.documentElement.classList.add("has-gsap");
+  }
+
+  const disposeEffects = () => {
+    window.removeEventListener("pagehide", onPageHide);
+    results.interactions?.();
+  };
+  const onPageHide = (event) => {
+    if (!event.persisted) disposeEffects();
+  };
+  window.addEventListener("pagehide", onPageHide);
 
   const preloader = document.querySelector("[data-preloader]");
   window.setTimeout(() => preloader?.classList.add("is-done"), 240);

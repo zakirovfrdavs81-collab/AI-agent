@@ -1,8 +1,32 @@
+# Environment & Secrets
 .env
+.env.*
+!.env.example
+*.pem
+*.key
+*.cert
+
+# Python
 .venv/
+venv/
+ENV/
 __pycache__/
-*.pyc
+*.py[cod]
+*$py.class
+*.sqlite3
 app.db
+*.db
+
+# Node & Frontend
 node_modules/
 dist/
+.vite/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Logs & Temp
+*.log
 *копия*
+.DS_Store
+Thumbs.db

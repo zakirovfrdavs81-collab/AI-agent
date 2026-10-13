@@ -2,9 +2,9 @@
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "Navo AI Go Live (Chrome, 5507)",
+      "label": "Navo AI Run (run.bat)",
       "type": "shell",
-      "command": "npm run go-live",
+      "command": "./run.bat",
       "options": {
         "cwd": "${workspaceFolder}"
       },

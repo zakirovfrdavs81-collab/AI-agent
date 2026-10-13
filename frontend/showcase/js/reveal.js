@@ -26,18 +26,85 @@ export function init({ reduced }) {
     element.dataset.revealHandled = "1";
   });
 
+  const revealElements = [...document.querySelectorAll("[data-reveal]:not([data-reveal-handled])")];
   if (useGsap) {
-    gsap.set("[data-reveal]:not([data-reveal-handled])", { opacity: 0, y: 30 });
-    ScrollTrigger.batch("[data-reveal]:not([data-reveal-handled])", {
-      start: "top 88%",
-      once: true,
-      onEnter: (batch) =>
-        gsap.to(batch, { opacity: 1, y: 0, duration: 1, stagger: 0.09, ease: "power3.out", overwrite: true }),
+    revealElements.forEach((element, index) => {
+      const card = element.matches("[data-tilt], .tilt");
+      const target = card ? element.querySelector(".tilt-inner") || element : element;
+      const direction = element.dataset.revealDirection || ["left", "right", "up"][index % 3];
+      const spinTargets = [...element.querySelectorAll("[data-reveal-spin]")];
+      const offset = {
+        left: { x: card ? -32 : -56, y: card ? 24 : 12, rotation: -1.5, rotationX: 4, rotationY: -8 },
+        right: { x: card ? 32 : 56, y: card ? 24 : 12, rotation: 1.5, rotationX: 4, rotationY: 8 },
+        up: { x: 0, y: card ? 32 : 42, rotation: 0, rotationX: -7, rotationY: 0 },
+      }[direction] || { x: 0, y: 42, rotation: 0, rotationX: -7, rotationY: 0 };
+      const delay = (index % 3) * 0.045;
+      let played = false;
+
+      gsap.set(element, { opacity: 0 });
+      gsap.set(target, {
+        x: offset.x,
+        y: offset.y,
+        rotation: offset.rotation,
+        rotationX: offset.rotationX,
+        rotationY: offset.rotationY,
+        scale: card ? 0.9 : 0.96,
+        transformPerspective: card ? 900 : 700,
+        transformOrigin: "50% 50%",
+      });
+      spinTargets.forEach((icon) => {
+        gsap.set(icon, {
+          rotationY: Number(icon.dataset.revealSpin) || 180,
+          scale: 0.72,
+          transformPerspective: 500,
+        });
+      });
+
+      const play = () => {
+        if (played) return;
+        played = true;
+        const motion = {
+          x: 0,
+          y: 0,
+          rotation: 0,
+          rotationX: 0,
+          rotationY: 0,
+          scale: 1,
+          duration: card ? 1.05 : 0.88,
+          delay,
+          ease: "power3.out",
+          overwrite: true,
+          onComplete: () => {
+            gsap.set(target, { clearProps: "transform" });
+            element.classList.add("is-visible");
+          },
+        };
+        if (target === element) {
+          gsap.to(element, { ...motion, opacity: 1 });
+        } else {
+          gsap.to(element, { opacity: 1, duration: 0.6, delay, ease: "power2.out", overwrite: true });
+          gsap.to(target, motion);
+        }
+        spinTargets.forEach((icon) => gsap.to(icon, {
+          rotationY: 0,
+          scale: 1,
+          duration: 0.9,
+          delay: delay + 0.08,
+          ease: "back.out(1.7)",
+          overwrite: true,
+          onComplete: () => gsap.set(icon, { clearProps: "transform" }),
+        }));
+      };
+
+      ScrollTrigger.create({
+        trigger: element,
+        start: "top 88%",
+        once: true,
+        onEnter: play,
+      });
     });
   } else {
-    observe(document.querySelectorAll("[data-reveal]:not([data-reveal-handled])"), (element) =>
-      element.classList.add("is-visible"),
-    );
+    observe(revealElements, (element) => element.classList.add("is-visible"));
   }
 
   // Kinetik matn: bo'laklar pastdan ko'tarilib chiqadi
@@ -201,4 +268,3 @@ function counters() {
 
   observe(nodes, run);
 }
-

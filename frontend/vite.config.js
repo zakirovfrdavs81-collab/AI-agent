@@ -8,7 +8,7 @@ const backendPort = process.env.BACKEND_PORT || process.env.PORT || "5507";
 
 export default defineConfig({
   root: frontendRoot,
-  base: "/",
+  base: process.env.VITE_BASE || "/",
   plugins: [react()],
   build: {
     outDir: "dist",

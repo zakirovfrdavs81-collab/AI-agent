@@ -53,38 +53,15 @@ ishlatish mumkin. Agar `frontend/index.html` mavjud bo'lmasa-yu, tayyor
 haqda ogohlantiradi. Manba Vite entry fayli `frontend/index.html` mavjud bo'lsa,
 har safar serverni yangidan boshlashdan oldin React frontend qayta yig'iladi.
 
-VS Code profilida Live Server (`ritwickdey.liveserver` 5.7.10) o'rnatilgan.
-Uning `Go Live` buyrug'i FastAPI'ni ishga tushirmaydi: workspace papkasini
-statik fayl serverida (odatda 5500-port) ko'rsatadi. Shu sabab
-`/frontend/showcase/index.html` ochilgan. Workspace sozlamalari extension
-buyrug'ini boshqa task bilan almashtira olmaydi; 5500-portdagi Live Server
-alohida server bo'lib qoladi va uni bu loyiha ishga tushirish jarayoni
-boshqarmaydi.
+> [!IMPORTANT]
+> **Go Live ishlatilmaydi, faqat ./run.bat!**
+> VS Code'dagi Live Server (`Go Live`) faqat statik fayl serveri bo'lib (`.vscode/settings.json` da 5500-portga sozlangan), u FastAPI backendni ishga tushirmaydi. Natijada `/app/` yo'lida "Cannot GET /app/" xatosi chiqadi va `/api/*` backend endpointlari umuman mavjud bo'lmaydi. Bundan tashqari u 5507-portni band qilib, FastAPI ishga tushishiga to'sqinlik qilishi mumkin.
+> Shu sababli **Go Live ishlatilmaydi, faqat ./run.bat** (yoki `npm start`) orqali bitta FastAPI serverida 5507-portda ishga tushiriladi:
+> - `/` -> landing page (`frontend/showcase`)
+> - `/app/` -> React ilovasi (`frontend/dist`)
+> - `/api/*` -> FastAPI backend API
 
-Live Server extension'ining status-bar tugmasi ko'rinadi. Workspace sozlamasi
-`/frontend` papkasini statik root qilib, `5500` portga biriktiradi. Shu sabab
-`frontend/showcase/index.html` fayli Live Server orqali
-`http://127.0.0.1:5500/showcase/index.html` manzilida ochiladi. Agar server
-eski root (`/frontend/showcase`) bilan avvaldan ishga tushgan bo'lsa,
-`/showcase/index.html` uchun `Cannot GET` qaytarishi mumkin: yangi root sozlamasi
-allaqachon ishlayotgan instance'ga avtomatik qo'llanmaydi. `Live Server: Stop
-Live Server` qilib, qayta `Go Live` bosish kerak. Uning lokal yo'naltirishi
-FastAPI tayyor bo'lsa, brauzerni `5507` dagi haqiqiy ilovaga olib o'tadi.
-Live Server faqat statik fayllarni xizmat qiladi; FastAPI'ni ishga tushirmaydi
-va `5507` portini band qilmasligi kerak.
-
-Extension'ning original `Go Live` buyrug'i FastAPI'ni ishga tushirmaydi.
-`5507` portdan FastAPI foydalanadi, aks holda port to'qnashadi. Shu sabab
-original tugma extension'ning statik preview vazifasida qoladi.
-`Ctrl+Shift+B` (`Tasks: Run Build Task`) — ushbu loyiha uchun to'liq
-bir-serverli amal:
-U frontendni build qiladi, FastAPI'ni 5507-portda boshlaydi yoki sog'lom
-mavjud ilovani qayta ishlatadi, so'ng Chrome'da to'g'ri URL'ni ochadi.
-
-`npm start` FastAPI ishga tushishida terminalga manzilni chiqaradi, API va
-frontend tayyor bo'lishini kutadi. 5507-portda shu Navo AI allaqachon ishlasa,
-ikkinchi server ochmasdan mavjud ilovani taniydi; boshqa jarayon band
-qilgan bo'lsa, jarayon PID'sini ko'rsatib to'xtaydi.
+`npm start` FastAPI ishga tushishida terminalga manzilni chiqaradi, API va frontend tayyor bo'lishini kutadi. 5507-portda shu Navo AI allaqachon ishlasa, ikkinchi server ochmasdan mavjud ilovani taniydi; boshqa jarayon band qilgan bo'lsa, jarayon PID'sini ko'rsatib, aniq xato bilan to'xtaydi.
 
 ## 1c. Premium landing page
 
@@ -147,8 +124,11 @@ Gmail App Password yarating, `.env` ichida `SMTP_HOST=smtp.gmail.com`,
 kodi` mavzusi bilan HTML va oddiy matn ko'rinishida yuboriladi. Kod 6 xonali,
 5 daqiqa amal qiladi; qayta yuborish orasida 60 soniya kutish bor.
 Port 465 implicit SSL (`SMTP_SSL`) bilan ishlatiladi; boshqa SMTP portlarda
-backend STARTTLS yoqadi. Render loglarida SMTP serveridan kelgan haqiqiy xato
-matni traceback bilan yoziladi.
+backend STARTTLS yoqadi. Backend start bo'lganda SMTP ulanishi va
+autentifikatsiyasini tekshiradi; natija server logida ko'rinadi. Email
+yuborishdagi xatoda SMTP kodi, javobi va xabar matni loglanadi, lekin parol,
+OTP kodi va qabul qiluvchi manzil yashiriladi. Gmail App Password ichiga
+nusxalashda kirib qolgan bo'sh joylar/tablar avtomatik olib tashlanadi.
 
 Gemini modeli javob bermasa yoki sekinlashsa, backend sozlangan modelni
 birinchi bo'lib sinab, keyin API kalitiga mos mavjud zaxira modellarni tekshiradi.
@@ -156,7 +136,10 @@ Hozirgi lokal sozlamada `GEMINI_MODEL=gemini-3.6-flash`; har bir model 25 soniya
 ichida javob bermasa, avtomatik ravishda keyingisiga o'tadi.
 
 Mahalliy sinovda OTPni ekranda ko'rsatish uchun `DEV_SHOW_OTP=true` qiling:
-email/SMS yuborilmaydi. Haqiqiy SMS/email uchun tegishli xizmat ma'lumotlarini
+oddiy ro'yxatdan o'tishda email/SMS yuborilmaydi va OTP terminal logiga
+chiqariladi. Google orqali kirish tasdiqlash kodi esa baribir SMTP orqali
+yuboriladi (sozlangan bo'lsa terminal logida ham ko'rinadi). Bu sozlamani
+production'da yoqmang. Haqiqiy SMS/email uchun tegishli xizmat ma'lumotlarini
 kiriting, `DEV_SHOW_OTP=false`, `OTP_MODE=live` qoldiring. Shunda xizmat
 sozlanmagan bo'lsa demo-kod qaytarilmaydi va API aniq xato qaytaradi.
 
