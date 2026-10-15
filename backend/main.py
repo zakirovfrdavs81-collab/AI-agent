@@ -40,7 +40,7 @@ from fastapi.responses import FileResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from pwdlib import PasswordHash
-from psycopg.rows import dict_row
+from psycopg.rows import DictRow, dict_row
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 BACKEND_ROOT = Path(__file__).resolve().parent
@@ -284,7 +284,11 @@ class PostgreSQLConnection:
 
 def db():
     if DATABASE_URL:
-        connection = psycopg.connect(DATABASE_URL, row_factory=dict_row, connect_timeout=15)
+        connection = psycopg.Connection[DictRow].connect(
+            DATABASE_URL,
+            row_factory=dict_row,
+            connect_timeout=15,
+        )
         return PostgreSQLConnection(connection)
     connection = sqlite3.connect(DB, timeout=15)
     connection.row_factory = sqlite3.Row
@@ -400,8 +404,8 @@ init_db()
 
 
 class RegisterInput(BaseModel):
-    email: str | None = None
-    phone: str | None = None
+    email: str | None = Field(default=None, max_length=254)
+    phone: str | None = Field(default=None, max_length=32)
     password: str = Field(min_length=8, max_length=128)
     nickname: str | None = Field(default=None, min_length=2, max_length=40)
 
@@ -412,17 +416,17 @@ class ProfileInput(BaseModel):
 
 
 class LoginInput(BaseModel):
-    identity: str
-    password: str
+    identity: str = Field(min_length=1, max_length=254)
+    password: str = Field(min_length=1, max_length=128)
 
 
 class LoginOtpInput(BaseModel):
-    email: str
+    email: str = Field(min_length=3, max_length=254)
     code: str = Field(min_length=6, max_length=6, pattern=r"^\d{6}$")
 
 
 class ForgotInput(BaseModel):
-    destination: str
+    destination: str = Field(min_length=1, max_length=254)
 
 
 class CodeInput(BaseModel):
@@ -1016,7 +1020,7 @@ async def index():
 
 @app.get("/app")
 async def app_redirect():
-    return RedirectResponse("/app/", status_code=307)
+    return FileResponse(frontend_page())
 
 
 @app.get("/app/")
@@ -1068,14 +1072,19 @@ async def me(session: str | None = Cookie(default=None)):
 
 
 @app.post("/api/auth/logout")
-async def logout(response: Response, request: Request = None, session: str | None = Cookie(default=None)):
+async def logout(response: Response, request: Request, session: str | None = Cookie(default=None)):
     if session:
         with db() as connection:
             connection.execute(
                 "DELETE FROM sessions WHERE token_hash=?", (hashlib.sha256(session.encode()).hexdigest(),)
             )
-    proto = request.headers.get("x-forwarded-proto", "").lower() if request else ""
-    is_https = proto == "https" or (request and request.url.scheme == "https") or APP_ORIGIN.startswith("https://") or is_production()
+    proto = request.headers.get("x-forwarded-proto", "").lower()
+    is_https = (
+        proto == "https"
+        or request.url.scheme == "https"
+        or APP_ORIGIN.startswith("https://")
+        or is_production()
+    )
     samesite = "none" if is_https and FRONTEND_ORIGIN != APP_ORIGIN else "lax"
     response.delete_cookie(
         "session",
@@ -1090,7 +1099,7 @@ async def logout(response: Response, request: Request = None, session: str | Non
 # --- Ro'yxatdan o'tish va kirish --------------------------------------------
 
 @app.post("/api/auth/register")
-async def register(payload: RegisterInput, request: Request = None):
+async def register(payload: RegisterInput, request: Request):
     destination = normalize(payload.email or payload.phone or "")
     if not destination:
         raise HTTPException(400, "Email yoki telefon raqamini kiriting.")
@@ -1161,7 +1170,7 @@ async def register(payload: RegisterInput, request: Request = None):
 
 @app.post("/api/auth/verify")
 @app.post("/api/auth/verify-otp")
-async def verify_code(payload: CodeInput, response: Response, request: Request = None):
+async def verify_code(payload: CodeInput, response: Response, request: Request):
     destination = normalize(payload.destination)
     identity_kind(destination)
     rate_limit(f"verify:{destination}", 20, 900)
@@ -1237,7 +1246,7 @@ async def verify_code(payload: CodeInput, response: Response, request: Request =
 
 
 @app.post("/api/auth/login")
-async def login(payload: LoginInput, response: Response, request: Request = None):
+async def login(payload: LoginInput, response: Response, request: Request):
     identity = normalize(payload.identity)
     if not identity:
         raise HTTPException(400, "Email yoki telefon raqamini kiriting.")
@@ -1294,7 +1303,7 @@ async def login(payload: LoginInput, response: Response, request: Request = None
 
 
 @app.post("/api/auth/verify-login-otp")
-async def verify_login_otp(payload: LoginOtpInput, response: Response, request: Request = None):
+async def verify_login_otp(payload: LoginOtpInput, response: Response, request: Request):
     email = normalize(payload.email)
     if identity_kind(email) != "email":
         raise HTTPException(422, "Email manzilni to‘g‘ri kiriting.")
@@ -1327,7 +1336,7 @@ async def verify_login_otp(payload: LoginOtpInput, response: Response, request: 
 # --- Parolni tiklash ---------------------------------------------------------
 
 @app.post("/api/auth/forgot")
-async def forgot(payload: ForgotInput, request: Request = None):
+async def forgot(payload: ForgotInput, request: Request):
     destination = normalize(payload.destination)
     identity_kind(destination)
     if not find_user(destination):
@@ -1362,7 +1371,7 @@ async def forgot(payload: ForgotInput, request: Request = None):
 
 @app.post("/api/auth/resend")
 @app.post("/api/auth/resend-otp")
-async def resend(payload: ResendInput, request: Request = None):
+async def resend(payload: ResendInput, request: Request):
     destination = normalize(payload.destination)
     kind = identity_kind(destination)
     purpose = payload.purpose
@@ -1437,7 +1446,7 @@ async def resend(payload: ResendInput, request: Request = None):
 
 
 @app.post("/api/auth/reset")
-async def reset(payload: ResetInput, request: Request = None):
+async def reset(payload: ResetInput, request: Request):
     destination = normalize(payload.destination)
     identity_kind(destination)
     rate_limit(f"reset:{destination}", 10, 900)
@@ -1595,6 +1604,7 @@ def save_message(connection, conversation_id: int, role: str, content: str, file
 
 # --- Biriktirilgan fayllarni Gemini uchun tayyorlash -------------------------
 
+MAX_ARCHIVE_XML_BYTES = 10 * 1024 * 1024
 ZIP_DOC_MIME_TYPES = {
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
     "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
@@ -1617,11 +1627,21 @@ def extract_document_text(data: bytes) -> str:
     """DOCX/XLSX/PPTX/ODT/ODS/ODP/EPUB (ZIP asosidagi) fayllardan matn ajratadi."""
     chunks: list[str] = []
     with zipfile.ZipFile(io.BytesIO(data)) as archive:
-        names = [name for name in archive.namelist() if name.endswith(".xml") and name.count("/") < 4]
-        for name in names[:40]:
+        xml_files = 0
+        total_xml_bytes = 0
+        for entry in archive.infolist():
+            name = entry.filename
+            if not name.endswith(".xml") or name.count("/") >= 4:
+                continue
+            if xml_files >= 40:
+                continue
+            xml_files += 1
+            total_xml_bytes += entry.file_size
+            if total_xml_bytes > MAX_ARCHIVE_XML_BYTES:
+                raise ValueError("Archive XML content exceeds extraction limits")
             try:
-                markup = archive.read(name).decode("utf-8", "ignore")
-            except (KeyError, zipfile.BadZipFile):
+                markup = archive.read(entry).decode("utf-8", "ignore")
+            except (KeyError, zipfile.BadZipFile, RuntimeError):
                 continue
             text = re.sub(r"<[^>]+>", " ", markup)
             text = html.unescape(re.sub(r"\s+", " ", text)).strip()
@@ -1637,7 +1657,7 @@ def attachment_parts(name: str, mime_type: str | None, data_base64: str) -> tupl
     qayta ishlandi. Juda katta matn 60 000 belgi bilan cheklanadi.
     """
     try:
-        raw = base64.b64decode(data_base64, validate=False)
+        raw = base64.b64decode(data_base64, validate=True)
     except (binascii.Error, ValueError):
         return [], f"{name}: fayl o‘qilmadi."
     suffix = Path(name).suffix.lower()
@@ -1871,10 +1891,19 @@ async def live_models(client: httpx.AsyncClient, key: str) -> list[str]:
         return []
     if response.status_code != 200:
         return []
+    try:
+        payload = response.json()
+    except ValueError:
+        logging.warning("Gemini model discovery returned invalid JSON.")
+        return []
+    if not isinstance(payload, dict) or not isinstance(payload.get("models"), list):
+        logging.warning("Gemini model discovery returned an unexpected response.")
+        return []
     return [
         str(item.get("name", "")).split("/")[-1]
-        for item in response.json().get("models", [])
-        if "generateContent" in (item.get("supportedGenerationMethods") or [])
+        for item in payload["models"]
+        if isinstance(item, dict)
+        and "generateContent" in (item.get("supportedGenerationMethods") or [])
     ]
 
 
@@ -2007,8 +2036,28 @@ async def chat(payload: ChatInput, session: str | None = Cookie(default=None)):
                         504,
                         "Gemini modellari javob berishga kechikdi. Bir ozdan so‘ng qayta urinib ko‘ring.",
                     ) from error
-                data = response.json() if response.content else {}
-                detail = str(data.get("error", {}).get("message", ""))
+                try:
+                    data = response.json() if response.content else {}
+                except ValueError as error:
+                    logging.error(
+                        "Gemini API returned invalid JSON (HTTP %s).",
+                        response.status_code,
+                    )
+                    raise HTTPException(
+                        502,
+                        "Gemini xizmati noto‘g‘ri javob qaytardi. Birozdan so‘ng qayta urinib ko‘ring.",
+                    ) from error
+                if not isinstance(data, dict):
+                    logging.error(
+                        "Gemini API returned an unexpected JSON response (HTTP %s).",
+                        response.status_code,
+                    )
+                    raise HTTPException(
+                        502,
+                        "Gemini xizmati kutilmagan javob qaytardi. Birozdan so‘ng qayta urinib ko‘ring.",
+                    )
+                error_data = data.get("error")
+                detail = str(error_data.get("message", "")) if isinstance(error_data, dict) else ""
                 if response.status_code < 400:
                     _model_probe.update({"name": model, "checked": time.time()})
                     break
@@ -2031,16 +2080,29 @@ async def chat(payload: ChatInput, session: str | None = Cookie(default=None)):
             503,
             "Google Gemini API bilan ulanish uzildi. Internet yoki Google API xizmati tiklangach qayta urinib ko‘ring.",
         ) from error
-    candidates = data.get("candidates") or []
+    candidates = data.get("candidates")
+    if candidates is not None and not isinstance(candidates, list):
+        raise HTTPException(502, "Gemini xizmati kutilmagan javob qaytardi.")
+    candidates = candidates or []
     if not candidates:
-        blocked = bool(data.get("promptFeedback", {}).get("blockReason"))
+        feedback = data.get("promptFeedback")
+        blocked = isinstance(feedback, dict) and bool(feedback.get("blockReason"))
         raise HTTPException(
             400,
             "Javob berilmadi: savol xavfsizlik filtridan o‘tmadi."
             if blocked
             else "Gemini javob qaytarmadi. Savolni boshqacha yozib ko‘ring.",
         )
-    text = "".join(part.get("text", "") for part in candidates[0].get("content", {}).get("parts", []))
+    candidate = candidates[0]
+    content = candidate.get("content") if isinstance(candidate, dict) else None
+    response_parts = content.get("parts") if isinstance(content, dict) else None
+    if not isinstance(response_parts, list):
+        raise HTTPException(502, "Gemini xizmati kutilmagan javob qaytardi.")
+    text = "".join(
+        part.get("text", "")
+        for part in response_parts
+        if isinstance(part, dict) and isinstance(part.get("text", ""), str)
+    )
     answer = text.strip() or "Javob olinmadi."
     stamp = int(time.time())
     with db() as connection:

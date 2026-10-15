@@ -379,9 +379,9 @@ function marquee() {
   });
 }
 
-/** Ilovaga boradigan havolalarni joriy domen ostidagi /app/ manziliga bog'laydi. */
+/** Ilovaga boradigan havolalarni joriy domen ostidagi /app manziliga bog'laydi. */
 function appLinks() {
-  document.querySelectorAll("[data-app-link]").forEach((link) => link.setAttribute("href", "/app/"));
+  document.querySelectorAll("[data-app-link]").forEach((link) => link.setAttribute("href", "/app"));
   document.querySelectorAll("[data-api-origin]").forEach((label) => {
     label.textContent = window.location.host;
   });

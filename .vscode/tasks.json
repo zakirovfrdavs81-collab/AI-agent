@@ -4,7 +4,7 @@
     {
       "label": "Navo AI Run (run.bat)",
       "type": "shell",
-      "command": "./run.bat",
+      "command": "${workspaceFolder}\\run.bat",
       "options": {
         "cwd": "${workspaceFolder}"
       },

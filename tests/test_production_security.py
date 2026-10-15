@@ -79,6 +79,29 @@ class ProductionSecurityTests(unittest.TestCase):
         self.assertEqual(res2.status_code, 200)
         self.assertEqual(res2.json(), {"status": "ok"})
 
+    def test_landing_and_application_are_served_by_fastapi(self):
+        from starlette.testclient import TestClient
+
+        client = TestClient(main.app)
+        landing = client.get("/")
+        application = client.get("/app")
+        application_slash = client.get("/app/")
+
+        self.assertEqual(landing.status_code, 200)
+        self.assertIn("Navo AI", landing.text)
+        self.assertIn('href="/app"', landing.text)
+        self.assertEqual(application.status_code, 200)
+        self.assertIn("/assets/", application.text)
+        self.assertEqual(application_slash.status_code, 200)
+
+    def test_api_routes_take_precedence_over_frontend_fallback(self):
+        from starlette.testclient import TestClient
+
+        client = TestClient(main.app)
+
+        self.assertEqual(client.get("/api/health").json(), {"status": "ok"})
+        self.assertEqual(client.get("/api/unknown-endpoint").status_code, 404)
+
     def test_favicon_and_logo_routes_accessible(self):
         from starlette.testclient import TestClient
 

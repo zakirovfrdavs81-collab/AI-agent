@@ -17,6 +17,7 @@ const appUrl = process.env.APP_ORIGIN
   ? `${process.env.APP_ORIGIN.trim().replace(/\/+$/, "")}/`
   : `http://${loopbackHost}:${port}/`;
 const startupTimeoutMs = 30_000;
+const openBrowser = process.argv.includes("--open-browser");
 
 if (!Number.isInteger(port) || port < 1 || port > 65535) {
   console.error(`XATO: PORT qiymati 1-65535 oralig'idagi butun son bo'lishi kerak; olindi: ${process.env.PORT}`);
@@ -81,6 +82,26 @@ async function isNavoAiRunning() {
   }
 }
 
+function openDefaultBrowser(url) {
+  const command = process.platform === "win32"
+    ? "cmd.exe"
+    : process.platform === "darwin"
+      ? "open"
+      : "xdg-open";
+  const args = process.platform === "win32"
+    ? ["/d", "/s", "/c", `start "" "${url}"`]
+    : [url];
+  const browser = spawn(command, args, {
+    detached: true,
+    stdio: "ignore",
+    windowsHide: true,
+  });
+  browser.once("error", (error) => {
+    console.error(`Brauzerni ochib bo'lmadi: ${error.message}`);
+  });
+  browser.unref();
+}
+
 const appIsReady = isNavoAiRunning;
 
 async function startBackend() {
@@ -137,6 +158,9 @@ async function startBackend() {
     console.log(`Navo AI tayyor: ${appUrl}`);
     console.log(`Ilova va ro'yxatdan o'tish/kirish: ${appUrl}app/`);
     console.log(`API tekshiruvi: ${appUrl}api/health`);
+    if (openBrowser) {
+      openDefaultBrowser("http://127.0.0.1:5507/");
+    }
     console.log("Serverni to'xtatish uchun Ctrl+C bosing.");
   } catch (error) {
     console.error(error.message);

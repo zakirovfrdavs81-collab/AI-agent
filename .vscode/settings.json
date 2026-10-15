@@ -4,5 +4,7 @@
   "liveServer.settings.CustomBrowser": "chrome",
   "liveServer.settings.NoBrowser": false,
   "liveServer.settings.showOnStatusbar": true,
-  "liveServer.settings.file": "showcase/index.html"
+  "liveServer.settings.file": "showcase/index.html",
+  "liveServer.settings.donotShowInfoMsg": true,
+  "liveServer.settings.multiRootWorkspaceName": "AI-agent"
 }

@@ -8,6 +8,7 @@ from unittest.mock import AsyncMock, patch
 
 import httpx
 from fastapi import HTTPException, Response
+from starlette.requests import Request
 
 from backend import main
 
@@ -265,7 +266,11 @@ class EmailDeliveryTests(unittest.TestCase):
                 patch.object(main.password_hash, "verify", return_value=True),
                 patch.object(main, "issue_code", new=AsyncMock(return_value=(None, False))),
             ):
-                await main.login(main.LoginInput(identity="user@example.com", password="valid-password"), Response())
+                await main.login(
+                    main.LoginInput(identity="user@example.com", password="password"),
+                    Response(),
+                    Request({"type": "http", "method": "POST", "path": "/api/auth/login", "headers": []}),
+                )
 
         with self.assertRaises(HTTPException) as raised:
             asyncio.run(run_login())
