@@ -28,6 +28,7 @@ from email.message import EmailMessage
 from email.utils import formataddr
 from pathlib import Path
 from typing import TypedDict
+from urllib.parse import parse_qsl, urlencode, urlsplit, urlunsplit
 
 import httpx
 import jwt
@@ -47,6 +48,19 @@ FRONTEND_ROOT = PROJECT_ROOT / "frontend"
 ROOT = PROJECT_ROOT
 load_dotenv(PROJECT_ROOT / ".env")
 os.environ.setdefault("FORWARDED_ALLOW_IPS", "*")
+
+
+def normalize_database_url(database_url: str) -> str:
+    if database_url.startswith("postgres://"):
+        database_url = "postgresql://" + database_url[len("postgres://"):]
+    if not database_url.startswith("postgresql://"):
+        return database_url
+
+    parsed = urlsplit(database_url)
+    query = parse_qsl(parsed.query, keep_blank_values=True)
+    if not any(key.lower() == "sslmode" for key, _ in query):
+        query.append(("sslmode", "require"))
+    return urlunsplit(parsed._replace(query=urlencode(query)))
 
 
 class SensitiveDataFilter(logging.Filter):
@@ -69,9 +83,7 @@ for _logger_name in ("", "uvicorn", "uvicorn.error", "uvicorn.access"):
     logging.getLogger(_logger_name).addFilter(SensitiveDataFilter())
 
 DB = Path(os.getenv("NAVO_DB_PATH", str(BACKEND_ROOT / "app.db")))
-DATABASE_URL = (os.getenv("DATABASE_URL") or "").strip()
-if DATABASE_URL.startswith("postgres://"):
-    DATABASE_URL = "postgresql://" + DATABASE_URL[len("postgres://"):]
+DATABASE_URL = normalize_database_url((os.getenv("DATABASE_URL") or "").strip())
 if (
     (os.getenv("REQUIRE_DATABASE_URL") or "").strip().lower() in {"1", "true", "yes", "on"}
     and not DATABASE_URL
@@ -116,7 +128,6 @@ FRONTEND_ORIGIN = (
 FRONTEND_APP_URL = f"{FRONTEND_ORIGIN}/app/"
 GOOGLE_REDIRECT_URI = (
     os.getenv("GOOGLE_REDIRECT_URI", "").strip()
-    or f"{APP_ORIGIN}/api/auth/google/callback"
 ).rstrip("/")
 
 configured_jwt_secret = (os.getenv("SESSION_SECRET") or "").strip()
@@ -146,20 +157,18 @@ else:
 password_hash = PasswordHash.recommended()
 app = FastAPI(title="Gemini Chat")
 
-configured_cors = (os.getenv("CORS_ALLOWED_ORIGINS") or os.getenv("CORS_ORIGINS") or "").strip()
-cors_origins_set = set()
-if configured_cors:
-    for origin in configured_cors.split(","):
-        origin = origin.strip().rstrip("/")
-        if origin and origin != "*":
-            cors_origins_set.add(origin)
-else:
-    if FRONTEND_ORIGIN and FRONTEND_ORIGIN != "*":
-        cors_origins_set.add(FRONTEND_ORIGIN)
-    if APP_ORIGIN and APP_ORIGIN != "*" and APP_ORIGIN != FRONTEND_ORIGIN:
-        cors_origins_set.add(APP_ORIGIN)
 
-cors_origins = sorted(cors_origins_set)
+def parse_cors_origins(value: str) -> list[str]:
+    return sorted(
+        {
+            origin
+            for candidate in value.split(",")
+            if (origin := candidate.strip().rstrip("/")) and origin != "*"
+        }
+    )
+
+
+cors_origins = parse_cors_origins(os.getenv("CORS_ALLOWED_ORIGINS") or "")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
@@ -709,13 +718,16 @@ def safe_email_error_value(value, secrets_to_mask: tuple[str, ...]) -> str:
     for secret in secrets_to_mask:
         if secret:
             text = text.replace(secret, "***MASKED***")
-    return text
+    return re.sub(r"[\r\n\t]+", " ", text)[:1000]
 
 
 def log_email_error(action: str, error: Exception, secrets_to_mask: tuple[str, ...]) -> None:
     code = getattr(error, "code", None) or getattr(error, "smtp_code", None) or getattr(error, "errno", None)
     response = getattr(error, "response", None)
-    if response is None:
+    if isinstance(error, httpx.HTTPStatusError):
+        code = error.response.status_code
+        response = error.response.text
+    elif response is None:
         response = getattr(error, "smtp_error", None)
     message = getattr(error, "message", None) or str(error)
     logging.getLogger("uvicorn.error").error(
@@ -888,8 +900,8 @@ async def verify_email_transport_on_startup():
                 "Email transport warning: EMAIL_PROVIDER is %s but required API credentials are missing", provider
             )
     else:
-        logging.getLogger("uvicorn.error").info(
-            "SMTP verification skipped: EMAIL_PROVIDER is %s", provider
+        logging.getLogger("uvicorn.error").warning(
+            "Email transport warning: EMAIL_PROVIDER '%s' is unsupported or not configured", provider
         )
 
 
@@ -977,7 +989,11 @@ def channel_label(channel: str) -> str:
 
 
 def google_ready() -> bool:
-    return bool(os.getenv("GOOGLE_CLIENT_ID") and os.getenv("GOOGLE_CLIENT_SECRET"))
+    return bool(
+        os.getenv("GOOGLE_CLIENT_ID")
+        and os.getenv("GOOGLE_CLIENT_SECRET")
+        and GOOGLE_REDIRECT_URI
+    )
 
 
 # --- Sahifalar va sozlamalar -------------------------------------------------

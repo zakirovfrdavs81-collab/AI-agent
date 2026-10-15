@@ -34,6 +34,39 @@ class ProductionSecurityTests(unittest.TestCase):
             with patch.dict(os.environ, {"DEV_SHOW_OTP": "true"}, clear=False):
                 self.assertFalse(main.dev_show_otp_enabled())
 
+    def test_dev_show_otp_is_enabled_in_development(self):
+        with patch.object(main, "is_production", return_value=False):
+            with patch.dict(os.environ, {"DEV_SHOW_OTP": "true"}, clear=False):
+                self.assertTrue(main.dev_show_otp_enabled())
+
+    def test_postgres_url_defaults_to_ssl_without_overriding_explicit_sslmode(self):
+        self.assertEqual(
+            main.normalize_database_url("postgres://user:pass@db.example/app"),
+            "postgresql://user:pass@db.example/app?sslmode=require",
+        )
+        self.assertEqual(
+            main.normalize_database_url(
+                "postgresql://user:pass@db.example/app?sslmode=verify-full"
+            ),
+            "postgresql://user:pass@db.example/app?sslmode=verify-full",
+        )
+
+    def test_google_requires_explicit_redirect_uri(self):
+        environment = {
+            "GOOGLE_CLIENT_ID": "client-id",
+            "GOOGLE_CLIENT_SECRET": "client-secret",
+        }
+        with patch.dict(os.environ, environment, clear=False):
+            with patch.object(main, "GOOGLE_REDIRECT_URI", ""):
+                self.assertFalse(main.google_ready())
+
+    def test_cors_uses_only_explicit_origins_and_rejects_wildcard(self):
+        self.assertEqual(
+            main.parse_cors_origins("https://app.example/, *, https://api.example"),
+            ["https://api.example", "https://app.example"],
+        )
+        self.assertEqual(main.parse_cors_origins(""), [])
+
     def test_health_endpoints_respond_ok(self):
         from starlette.testclient import TestClient
 

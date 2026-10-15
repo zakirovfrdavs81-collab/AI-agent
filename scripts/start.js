@@ -1,4 +1,5 @@
 import { spawn } from "node:child_process";
+import { existsSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import { getPortListeners, isPortTaken } from "./port.js";
@@ -11,10 +12,24 @@ const fallbackLocalPort = 5507;
 const port = Number(process.env.PORT || fallbackLocalPort);
 const host = process.env.HOST || "0.0.0.0";
 const loopbackHost = host === "0.0.0.0" ? "127.0.0.1" : host;
+const localBaseUrl = `http://${loopbackHost}:${port}/`;
 const appUrl = process.env.APP_ORIGIN
-  ? `${process.env.APP_ORIGIN.replace(/\/+$/, "")}/`
+  ? `${process.env.APP_ORIGIN.trim().replace(/\/+$/, "")}/`
   : `http://${loopbackHost}:${port}/`;
 const startupTimeoutMs = 30_000;
+
+if (!Number.isInteger(port) || port < 1 || port > 65535) {
+  console.error(`XATO: PORT qiymati 1-65535 oralig'idagi butun son bo'lishi kerak; olindi: ${process.env.PORT}`);
+  process.exit(1);
+}
+
+if (!existsSync(path.join(projectRoot, "frontend", "dist", "index.html"))) {
+  console.error(
+    "XATO: frontend/dist/index.html topilmadi. Avval `npm run build` buyrug'ini bajaring; " +
+    "server start vaqtida frontend build qilmaydi."
+  );
+  process.exit(1);
+}
 
 const portInUse = await isPortTaken(port, loopbackHost);
 if (portInUse) {
@@ -39,8 +54,8 @@ if (portInUse) {
 async function isNavoAiRunning() {
   try {
     const [healthRes, apiHealthRes] = await Promise.all([
-      fetch(`${appUrl}health`, { signal: AbortSignal.timeout(1500) }).catch(() => null),
-      fetch(`${appUrl}api/health`, { signal: AbortSignal.timeout(1500) }).catch(() => null),
+      fetch(`${localBaseUrl}health`, { signal: AbortSignal.timeout(1500) }).catch(() => null),
+      fetch(`${localBaseUrl}api/health`, { signal: AbortSignal.timeout(1500) }).catch(() => null),
     ]);
 
     const activeRes = (healthRes && healthRes.ok) ? healthRes : ((apiHealthRes && apiHealthRes.ok) ? apiHealthRes : null);
@@ -50,7 +65,7 @@ async function isNavoAiRunning() {
     if (!data || data.status !== "ok") return false;
 
     try {
-      const configRes = await fetch(`${appUrl}api/config`, { signal: AbortSignal.timeout(1500) });
+      const configRes = await fetch(`${localBaseUrl}api/config`, { signal: AbortSignal.timeout(1500) });
       if (configRes.ok) {
         const config = await configRes.json();
         if (typeof config.google_login === "boolean" || typeof config.email_channel === "string") {

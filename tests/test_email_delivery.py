@@ -313,6 +313,7 @@ class EmailDeliveryTests(unittest.TestCase):
         }
         response = httpx.Response(
             401,
+            content=b"invalid API key test-api-key for recipient@example.com",
             request=httpx.Request("POST", "https://api.brevo.com/v3/smtp/email"),
         )
         with (
@@ -325,6 +326,8 @@ class EmailDeliveryTests(unittest.TestCase):
         self.assertFalse(sent)
         diagnostic = "\n".join(captured.output)
         self.assertIn("HTTPStatusError", diagnostic)
+        self.assertIn("code=401", diagnostic)
+        self.assertIn("invalid API key", diagnostic)
         self.assertNotIn("test-api-key", diagnostic)
         self.assertNotIn("recipient@example.com", diagnostic)
 

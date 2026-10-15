@@ -11,15 +11,6 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&family=Sora:wght@600;700;800&display=swap" />
-    <script>
-      (() => {
-        const localHost = window.location.hostname === "127.0.0.1"
-          || window.location.hostname === "localhost";
-        if (localHost && window.location.port !== "5507") {
-          window.location.replace("http://127.0.0.1:5507" + (window.location.pathname.includes("/app") ? "/app/" : "/"));
-        }
-      })();
-    </script>
     <script src="/showcase/vendor/tailwind.js"></script>
     <script>
       tailwind.config = {

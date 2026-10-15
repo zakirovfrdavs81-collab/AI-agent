@@ -379,12 +379,10 @@ function marquee() {
   });
 }
 
-/** "Navo AI'ni ochish" va "Ilovani ochish" havolalarini 5507 dagi /app/ ga xatolarsiz olib boradigan qilish */
+/** Ilovaga boradigan havolalarni joriy domen ostidagi /app/ manziliga bog'laydi. */
 function appLinks() {
-  const isLocal = window.location.hostname === "127.0.0.1" || window.location.hostname === "localhost";
-  const target = (isLocal && window.location.port !== "5507") ? "http://127.0.0.1:5507/app/" : "/app/";
-  document.querySelectorAll("[data-app-link]").forEach((link) => link.setAttribute("href", target));
+  document.querySelectorAll("[data-app-link]").forEach((link) => link.setAttribute("href", "/app/"));
   document.querySelectorAll("[data-api-origin]").forEach((label) => {
-    label.textContent = isLocal ? "127.0.0.1:5507" : window.location.host;
+    label.textContent = window.location.host;
   });
 }

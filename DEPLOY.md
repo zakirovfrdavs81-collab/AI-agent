@@ -1,6 +1,6 @@
 # 🚀 Navo AI — Production Deploy Bo'yicha To'liq Qo'llanma
 
-Ushbu qo'llanmada **Navo AI** ilovasini production muhitida (VPS, Docker, Railway, Fly.io) xavfsiz va to'g'ri ishga tushirish bo'yicha to'liq qadamlar keltirilgan.
+Ushbu qo'llanmada **Navo AI** ilovasini production muhitida (Render, VPS, Docker, Railway, Fly.io) xavfsiz va to'g'ri ishga tushirish bo'yicha to'liq qadamlar keltirilgan.
 
 ---
 
@@ -12,6 +12,7 @@ Ushbu qo'llanmada **Navo AI** ilovasini production muhitida (VPS, Docker, Railwa
 5. [Yangilash tartibi (Update Guide)](#5-yangilash-tartibi-update-guide)
 6. [Monitoring, Loglarni ko'rish va Healthcheck](#6-monitoring-loglarni-korish-va-healthcheck)
 7. [Qo'lda bajarilishi kerak bo'lgan ishlar ro'yxati](#7-qolda-bajarilishi-kerak-bolgan-ishlar-royxati)
+8. [Render + PostgreSQL + Brevo](#8-render--postgresql--brevo)
 
 ---
 
@@ -36,14 +37,14 @@ Haqiqiy serverda `.env` faylini yarating va quyidagi o'zgaruvchilarni to'ldiring
 | `PORT` | Server porti | `5507` | **Majburiy** |
 | `APP_ORIGIN` | Asosiy domen manzili (protokol bilan, oxirida `/` bo'lmasin) | `https://yourdomain.com` | **Majburiy** |
 | `FRONTEND_ORIGIN` | Frontend domen manzili | `https://yourdomain.com` | **Majburiy** |
-| `CORS_ALLOWED_ORIGINS`| CORS ruxsat etilgan domenlar (vergul bilan) | `https://yourdomain.com` | **Majburiy** |
+| `CORS_ALLOWED_ORIGINS`| CORS ruxsat etilgan originlar (vergul bilan; boshqa origin kerak bo'lsa) | `https://yourdomain.com` | Domenlarga bog'liq |
 | `SESSION_SECRET` | Sessiya va JWT shifrlash kaliti (kamida 32 ta belgi) | *Tasodifiy 64 belgili satr* | **Majburiy (Production'da)** |
 | `FORWARDED_ALLOW_IPS` | Reverse proxy IP manzillari | `*` yoki `127.0.0.1` | **Majburiy (Nginx ortida)** |
 | `GEMINI_API_KEY` | Google Gemini AI kaliti | `AIzaSy...` | **Majburiy** |
 | `GEMINI_MODEL` | Gemini modeli | `gemini-flash-latest` | Tavsiya etiladi |
 | `GOOGLE_CLIENT_ID` | Google OAuth Client ID | `...apps.googleusercontent.com` | Google auth uchun |
 | `GOOGLE_CLIENT_SECRET`| Google OAuth Client Secret | `GOCSPX-...` | Google auth uchun |
-| `GOOGLE_REDIRECT_URI` | Google OAuth qaytish manzili | `https://yourdomain.com/api/auth/google/callback` | Google auth uchun |
+| `GOOGLE_REDIRECT_URI` | Google OAuth qaytish manzili; avtomatik hosil qilinmaydi | `https://yourdomain.com/api/auth/google/callback` | Google auth uchun |
 | `EMAIL_PROVIDER` | Email provayderi (`smtp`, `resend`, `brevo`) | `smtp` | **Majburiy** |
 | `SMTP_HOST` | SMTP server manzili | `smtp.gmail.com` | SMTP uchun |
 | `SMTP_PORT` | SMTP porti (465 = SSL, 587 = STARTTLS) | `465` | SMTP uchun |
@@ -198,7 +199,7 @@ sudo systemctl restart navo-ai
 ### 1. Healthcheck tekshiruvi:
 Serverning ishlash holatini istalgan monitoring tizimi (UptimeKuma, BetterStack) orqali kuzatish mumkin:
 ```bash
-curl -I https://yourdomain.com/health
+curl -i https://yourdomain.com/api/health
 # HTTP/2 200
 # {"status":"ok"}
 ```
@@ -242,3 +243,78 @@ Quyidagi amallarni faqat server egasi (administrator) o'z hisoblarida qo'lda baj
 4. **Xavfsizlik**:
    - `.env` faylini hech qachon Git'ga commit qilmang.
    - `SESSION_SECRET` ni kamida 32 ta belgidan iborat tasodifiy satr qilib belgilang.
+
+---
+
+## 8. Render + PostgreSQL + Brevo
+
+Render'da `render.yaml` dagi yagona Python Web Service'ni yarating. U frontendni deploy build bosqichida yig'adi, FastAPI esa `frontend/dist/` ni beradi; `npm start` build qilmaydi va Render bergan `PORT` portida tinglaydi. Build buyrug'i:
+
+```sh
+npm install && pip install -r backend/requirements.txt && npm run build
+```
+
+`package-lock.json` loyiha ildizida saqlanadi; Python bog'liqliklari `backend/requirements.txt` dan o'rnatiladi. Render native runtime'lari Debian 12 asosida bo'lib, Python runtime'da `node`, `npm`, `python3` va `pip` mavjud; shu sababli buyruqlar bitta Python web service build muhitida bajariladi. Render konfiguratsiyasidagi Python versiyasi `3.11.11`. Build muvaffaqiyatsiz bo'lsa, Render Build Logs'da `npm install`, `pip install` yoki `npm run build` bosqichidagi xatoni tekshiring. Start jarayonida dist yo'q bo'lsa server aniq xato bilan to'xtaydi.
+
+### Render muhit o'zgaruvchilari
+
+`render.yaml` avtomatik belgilaydigan `ENVIRONMENT=production`, `HOST=0.0.0.0`, `REQUIRE_DATABASE_URL=true`, `EMAIL_PROVIDER=brevo` va `DEV_SHOW_OTP=false` ni o'zgartirmang. Quyidagi `sync: false` qiymatlarini Render Dashboard'da to'ldiring:
+
+| O'zgaruvchi | Maxfiymi? | Qiymat qayerdan olinadi / nimaga bog'liq |
+| --- | --- | --- |
+| `DATABASE_URL` | Ha | Neon yoki Supabase PostgreSQL loyihasining pooled/direct ulanish URI'si. `sslmode` berilmagan URI'ga ilova `sslmode=require` qo'shadi; mavjud `sslmode` saqlanadi. |
+| `APP_ORIGIN` | Yo'q | Render Web Service domeni yoki biriktirilgan custom domain, `https://` bilan va oxirgi `/` siz. |
+| `FRONTEND_ORIGIN` | Yo'q | Shu yagona servisdagi frontend origin; odatda `APP_ORIGIN` bilan bir xil. |
+| `CORS_ALLOWED_ORIGINS` | Yo'q | Ruxsat etiladigan aniq origin(lar), masalan servisning HTTPS origin'i; bir nechta qiymat vergul bilan. `*` ishlatmang. |
+| `GOOGLE_REDIRECT_URI` | Yo'q | `APP_ORIGIN` + `/api/auth/google/callback`. Xuddi shu URI Google Cloud OAuth Client'dagi **Authorized redirect URIs** ga kiritilsin. |
+| `GEMINI_API_KEY` | Ha | Google AI Studio'dan olingan API key. |
+| `SESSION_SECRET` | Ha | `render.yaml` Render'da tasodifiy qiymat yaratadi; kamida 32 belgili bo'lishi kerak. |
+| `BREVO_API_KEY` | Ha | Brevo hisobidagi transactional API key. |
+| `BREVO_SENDER_EMAIL` | Yo'q | Brevo'da tasdiqlangan sender emaili; domen Brevo'da autentifikatsiya qilingan bo'lishi kerak. |
+| `GOOGLE_CLIENT_ID` | Yo'q | Google Cloud Console OAuth 2.0 Client ID. |
+| `GOOGLE_CLIENT_SECRET` | Ha | Shu OAuth Client uchun Google Cloud Console'dagi client secret. |
+| `ESKIZ_EMAIL` | Ha | SMS ishlatilsa Eskiz login. Email uchun shart emas. |
+| `ESKIZ_PASSWORD` | Ha | SMS ishlatilsa Eskiz paroli. Email uchun shart emas. |
+
+`PORT` ni qo'lda kiritmang: Render uni runtime'da beradi. `PYTHON_VERSION`, `HOST`, `ENVIRONMENT`, `REQUIRE_DATABASE_URL`, `EMAIL_PROVIDER`, `DEV_SHOW_OTP` va `OTP_MODE` esa `render.yaml` dagi qiymatlar bilan beriladi. Google OAuth ishlatmasangiz, callback sozlamalari zarur emas, lekin `GOOGLE_REDIRECT_URI` kiritilmaguncha Google login ishlamaydi. CORS middleware faqat `CORS_ALLOWED_ORIGINS` dagi originlarga ruxsat beradi; yagona domenli frontend/API uchun shu domenni kiriting.
+
+### SQLite ma'lumotlarini PostgreSQL'ga ko'chirish
+
+`scripts/migrate-sqlite-to-postgres.py` lokal `backend/app.db` (yoki `NAVO_DB_PATH`) ni `MIGRATION_DATABASE_URL` ga ko'chiradi; u bo'lmasa `DATABASE_URL` ni ishlatadi. Migratsiya maqsad PostgreSQL jadvallarida yozuv bo'lsa to'xtaydi va ma'lumot ustidan yozmaydi. Avval bo'sh Postgres bazasini tayyorlang. Migratsiya kodini import qilishda schema jadvallari yaratiladi, so'ng SQLite yozuvlari ko'chadi.
+
+PowerShell'da lokal loyiha ildizidan ishga tushirish:
+
+```powershell
+$env:MIGRATION_DATABASE_URL = "<bo'sh PostgreSQL bazasining maxfiy URI qiymati>"
+python .\scripts\migrate-sqlite-to-postgres.py
+```
+
+Linux/macOS'da:
+
+```sh
+read -rsp "MIGRATION_DATABASE_URL: " MIGRATION_DATABASE_URL
+export MIGRATION_DATABASE_URL
+echo
+python scripts/migrate-sqlite-to-postgres.py
+```
+
+URI qiymatini buyruqlar tarixi/loglariga yozib qo'ymang. Ko'chirish tugagach, Render'dagi `DATABASE_URL` ni aynan maqsad bazaga sozlang va `REQUIRE_DATABASE_URL=true` ekanini tekshiring. Migratsiyadan keyin shu terminalda `psql "$MIGRATION_DATABASE_URL" -c 'SELECT COUNT(*) FROM users;'` bilan yozuvlarni tekshirish mumkin. Migratsiya deploy'dan oldin, SQLite fayli mavjud lokal muhitda bajariladi; Render Web Service'da alohida local SQLite fayli bo'lmaydi. Ushbu yo'riqnoma haqiqiy bazaga qarshi bajarilmadi.
+
+### Deploy'dan keyin tekshirish ro'yxati
+
+1. Render **Build Logs**'da `npm install`, `pip install` va `npm run build` muvaffaqiyatli tugaganini, **Deploy Logs**'da FastAPI `0.0.0.0` va Render bergan portda ishga tushganini tekshiring.
+2. `https://<Render-domeni>/api/health` so'rovi `200` va `{"status":"ok"}` qaytarishi kerak; `render.yaml` health check ham shu yo'lni ishlatadi.
+3. `DATABASE_URL` va `REQUIRE_DATABASE_URL=true` to'g'ri ekanini Render loglaridan tasdiqlang; ulanish xatosida URI/credential'ni log yoki chatga yubormang.
+4. Sayt, ro'yxatdan o'tish va login'ni HTTPS orqali sinang. Production'da `DEV_SHOW_OTP=true` e'tiborga olinmaydi; OTP email orqali yuborilishi kerak.
+5. Brevo sender domeni va API kalitini tekshiring. Xatolik bo'lsa loglarda HTTP status va javob tafsiloti bo'ladi; API key/parol loglanmaydi.
+6. Google login ishlatilsa Google Console'dagi Authorized redirect URI `GOOGLE_REDIRECT_URI` bilan belgima-belgi mos bo'lsin. Brauzerda callbackdan keyin sessiya cookie'si `Secure` va `HttpOnly` bo'lishini tekshiring.
+7. `APP_ORIGIN`, `FRONTEND_ORIGIN` va `CORS_ALLOWED_ORIGINS` qiymatlari real Render/custom domeniga mos bo'lsin.
+
+### Lokal va Render farqi
+
+| Lokal | Render |
+| --- | --- |
+| `.env` qo'lda boshqariladi; `DATABASE_URL` bo'sh bo'lsa `backend/app.db` SQLite ishlatiladi. | Sirlar va domenlar Render Environment Variables'da saqlanadi; `REQUIRE_DATABASE_URL=true` sababli `DATABASE_URL` bo'lmasa server aniq xato bilan startni to'xtatadi. |
+| `npm start` uchun `PORT` berilmasa `5507`; `run.bat` frontendni oldin build qiladi. | Render `PORT` ni runtime'da beradi; build faqat `buildCommand` da, start esa tayyor `frontend/dist/` ni talab qiladi. |
+| `ENVIRONMENT=development` bo'lsa `DEV_SHOW_OTP=true` OTP'ni terminalga chiqaradi. | `ENVIRONMENT=production` da OTP terminalga chiqmaydi, hatto `DEV_SHOW_OTP=true` berilsa ham. |
+| HTTP local origin va local SQLite. | HTTPS reverse proxy, production cookie (`Secure`) va managed PostgreSQL; callback/CORS originlar domenga bog'liq. |
