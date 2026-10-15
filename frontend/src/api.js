@@ -25,7 +25,16 @@ export async function apiRequest(path, options = {}) {
       : Array.isArray(detail)
         ? detail.map((item) => item?.msg || String(item)).join(", ")
         : detail?.message || detail?.msg || `Server xatosi (${response.status}).`;
-    throw new Error(message);
+    const error = new Error(message);
+    if (Array.isArray(detail)) {
+      error.validationErrors = detail
+        .map((item) => ({
+          field: Array.isArray(item?.loc) ? item.loc.join(".") : "",
+          message: item?.msg || "",
+        }))
+        .filter((item) => item.field);
+    }
+    throw error;
   }
   return data;
 }

@@ -4,17 +4,29 @@ export default function SceneEffects() {
   useEffect(() => {
     const finePointer = window.matchMedia("(hover: hover) and (pointer: fine)");
     const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const cursorRoot = document.createElement("div");
+    cursorRoot.className = "app-custom-cursor";
+    cursorRoot.setAttribute("aria-hidden", "true");
+    const cursorDot = document.createElement("span");
+    cursorDot.className = "app-custom-cursor-dot";
+    const cursorRing = document.createElement("span");
+    cursorRing.className = "app-custom-cursor-ring";
+    cursorRoot.append(cursorDot, cursorRing);
+    document.body.appendChild(cursorRoot);
 
     let enabled = false;
+    let cursorEnabled = false;
     let visible = false;
+    let cursorVisible = false;
     let frame = 0;
     let hovered = null;
     let magnet = null;
     let tilted = null;
     const magnetPosition = { x: 0, y: 0 };
     const magnetTarget = { x: 0, y: 0 };
+    const cursorPosition = { x: 0, y: 0, ringX: 0, ringY: 0 };
     const magneticElements = new Set();
-    const magnetSelector = ".suggestion-card, .suggestion-more, .new-chat-button, .sidebar-link, .primary-button, .send-button, .account-card, .icon-button, .tool-button, .google-auth, .auth-tabs button";
+    const magnetSelector = ".suggestion-card";
     const interactiveSelector = "button:not(:disabled), a[href], [role='button']";
     const effectElements = new Set();
 
@@ -102,7 +114,17 @@ export default function SceneEffects() {
       }
       const settled = Math.abs(magnetTarget.x - magnetPosition.x) < 0.1
         && Math.abs(magnetTarget.y - magnetPosition.y) < 0.1;
-      frame = visible && !settled ? requestAnimationFrame(render) : 0;
+      const cursorSettled = Math.abs(cursorPosition.x - cursorPosition.ringX) < 0.18
+        && Math.abs(cursorPosition.y - cursorPosition.ringY) < 0.18;
+      if (cursorVisible && !reducedMotion.matches) {
+        cursorPosition.ringX += (cursorPosition.x - cursorPosition.ringX) * 0.42;
+        cursorPosition.ringY += (cursorPosition.y - cursorPosition.ringY) * 0.42;
+        cursorRing.style.transform =
+          `translate3d(${cursorPosition.ringX.toFixed(2)}px,${cursorPosition.ringY.toFixed(2)}px,0) translate(-50%,-50%)`;
+      }
+      frame = visible && (!settled || (cursorVisible && !cursorSettled && !reducedMotion.matches))
+        ? requestAnimationFrame(render)
+        : 0;
     };
 
     const scheduleRender = () => {
@@ -110,9 +132,36 @@ export default function SceneEffects() {
     };
 
     const pointerMove = (event) => {
-      if (!enabled || event.pointerType === "touch") return;
+      if (!cursorEnabled || (event.pointerType && event.pointerType !== "mouse")) return;
       visible = true;
-      const target = event.target instanceof Element ? event.target.closest(interactiveSelector) : null;
+      const targetElement = event.target instanceof Element ? event.target : null;
+      const interactiveTarget = targetElement?.closest(interactiveSelector) || null;
+      const textTarget = !interactiveTarget && Boolean(targetElement?.closest("input,textarea,select,[contenteditable='true'],p,h1,h2,h3,h4,blockquote,pre,code,label"));
+      cursorVisible = !textTarget;
+      cursorRoot.classList.toggle("is-text-entry", textTarget);
+      cursorRoot.classList.toggle("is-interactive", Boolean(interactiveTarget));
+      if (cursorVisible) {
+        cursorRoot.classList.add("is-visible");
+        cursorPosition.x = event.clientX;
+        cursorPosition.y = event.clientY;
+        cursorDot.style.transform = `translate3d(${event.clientX}px,${event.clientY}px,0) translate(-50%,-50%)`;
+        if (reducedMotion.matches) {
+          cursorPosition.ringX = event.clientX;
+          cursorPosition.ringY = event.clientY;
+          cursorRing.style.transform = cursorDot.style.transform;
+        }
+      } else {
+        cursorRoot.classList.remove("is-visible");
+      }
+      if (!enabled) {
+        hovered?.removeAttribute("data-cursor-hover");
+        hovered = null;
+        resetMagnet();
+        resetTilt();
+        scheduleRender();
+        return;
+      }
+      const target = interactiveTarget;
       if (hovered !== target) {
         hovered?.removeAttribute("data-cursor-hover");
         hovered = target;
@@ -135,6 +184,8 @@ export default function SceneEffects() {
       });
       resetMagnet();
       resetTilt();
+      cursorVisible = false;
+      cursorRoot.classList.remove("is-visible", "is-interactive", "is-text-entry");
     };
 
     const onVisibilityChange = () => {
@@ -142,10 +193,14 @@ export default function SceneEffects() {
     };
 
     const syncMotion = () => {
+      cursorEnabled = finePointer.matches;
       enabled = finePointer.matches && !reducedMotion.matches;
-      if (!enabled) {
+      if (!cursorEnabled) {
         pointerLeave();
         stop();
+      } else if (!enabled) {
+        resetMagnet();
+        resetTilt();
       }
     };
 
@@ -181,6 +236,7 @@ export default function SceneEffects() {
         element.style.removeProperty("--tilt-x");
         element.style.removeProperty("--tilt-y");
       });
+      cursorRoot.remove();
     };
   }, []);
 

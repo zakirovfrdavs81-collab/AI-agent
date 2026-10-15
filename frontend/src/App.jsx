@@ -173,6 +173,72 @@ function highlightMatches(text, query) {
   return parts;
 }
 
+function validateAuthField(field, mode, stage, form) {
+  const value = String(form[field] || "").trim();
+  if (field === "identity" && (mode === "login" || mode === "register") && stage === "identity") {
+    if (!value) return "Email yoki telefon raqamini kiriting.";
+    if (value.includes("@")) {
+      return /^[^@\s]+@[^@\s]+\.[A-Za-z]{2,}$/.test(value) ? "" : "Email manzilni to‘g‘ri kiriting.";
+    }
+    const phone = value.replace(/[\s\-()]/g, "").replace(/^998/, "+998");
+    return /^\+998\d{9}$/.test(phone) ? "" : "Telefonni +998901234567 ko‘rinishida kiriting.";
+  }
+  if (field === "password" && ((stage !== "code" && stage !== "login_otp") || mode === "reset")) {
+    if (!value) return "Parolni kiriting.";
+    if (value.length < 8) return "Parol kamida 8 ta belgidan iborat bo‘lsin.";
+    if (value.length > 128) return "Parol 128 belgidan oshmasligi kerak.";
+  }
+  if (field === "nickname" && mode === "register" && stage === "identity") {
+    if (!value) return "Ismingiz yoki nicknameni kiriting.";
+    if (value.length < 2) return "Ism kamida 2 ta belgidan iborat bo‘lsin.";
+    if (value.length > 40) return "Ism 40 belgidan oshmasligi kerak.";
+  }
+  if (field === "code" && (stage === "code" || stage === "login_otp")) {
+    return /^\d{6}$/.test(value) ? "" : "6 xonali tasdiqlash kodini kiriting.";
+  }
+  return "";
+}
+
+function validateAuthForm(mode, stage, form) {
+  const fields = stage === "code" || stage === "login_otp"
+    ? ["code", ...(mode === "reset" ? ["password"] : [])]
+    : ["identity", "password", ...(mode === "register" ? ["nickname"] : [])];
+  return Object.fromEntries(fields
+    .map((field) => [field, validateAuthField(field, mode, stage, form)])
+    .filter(([, message]) => message));
+}
+
+function authFieldErrorsFromServer(error, mode, stage, form, message) {
+  const errors = {};
+  const fieldNames = {
+    email: "identity",
+    phone: "identity",
+    identity: "identity",
+    password: "password",
+    nickname: "nickname",
+    code: "code",
+  };
+  for (const validationError of error?.validationErrors || []) {
+    const fieldName = validationError.field?.split(".").pop();
+    const field = fieldNames[fieldName];
+    if (!field) continue;
+    errors[field] = validateAuthField(field, mode, stage, form) || "Kiritilgan ma’lumotni tekshiring.";
+  }
+  if (Object.keys(errors).length) return errors;
+
+  const text = String(message || "").toLowerCase();
+  const field = text.includes("email") || text.includes("telefon") || text.includes("raqam")
+    ? "identity"
+    : text.includes("parol")
+      ? "password"
+      : text.includes("nickname") || text.includes("ism")
+        ? "nickname"
+        : text.includes("kod")
+          ? "code"
+          : "";
+  return field ? { [field]: message } : {};
+}
+
 function readStorage(key, fallback) {
   try {
     const value = localStorage.getItem(key);
@@ -220,6 +286,7 @@ export default function App() {
   const [authStage, setAuthStage] = useState("identity");
   const [authBusy, setAuthBusy] = useState(false);
   const [authError, setAuthError] = useState("");
+  const [authFieldErrors, setAuthFieldErrors] = useState({});
   const [authNotice, setAuthNotice] = useState("");
   const [demoCode, setDemoCode] = useState("");
   const [authForm, setAuthForm] = useState({ identity: "", password: "", nickname: "", code: "" });
@@ -288,6 +355,29 @@ export default function App() {
     setToast(message);
     window.setTimeout(() => setToast(""), 2600);
   }, []);
+
+  function changeAuthField(field, value) {
+    const nextForm = { ...authForm, [field]: value };
+    setAuthForm(nextForm);
+    setAuthFieldErrors((current) => {
+      if (!Object.hasOwn(current, field)) return current;
+      const message = validateAuthField(field, authMode, authStage, nextForm);
+      if (message) return { ...current, [field]: message };
+      const nextErrors = { ...current };
+      delete nextErrors[field];
+      return nextErrors;
+    });
+  }
+
+  function validateAuthFieldOnBlur(field) {
+    const message = validateAuthField(field, authMode, authStage, authForm);
+    setAuthFieldErrors((current) => {
+      if (message) return { ...current, [field]: message };
+      const nextErrors = { ...current };
+      delete nextErrors[field];
+      return nextErrors;
+    });
+  }
 
   const loadConversations = useCallback(async () => {
     const data = await apiRequest("/conversations");
@@ -395,6 +485,12 @@ export default function App() {
 
   async function submitAuth(event) {
     event.preventDefault();
+    const fieldErrors = validateAuthForm(authMode, authStage, authForm);
+    setAuthFieldErrors(fieldErrors);
+    if (Object.keys(fieldErrors).length) {
+      setAuthError("");
+      return;
+    }
     setAuthError("");
     setAuthNotice("");
     setAuthBusy(true);
@@ -438,7 +534,14 @@ export default function App() {
         }
       }
     } catch (error) {
-      setAuthError(authErrorMessage(error, "Amalni bajarib bo‘lmadi. Qayta urinib ko‘ring."));
+      const message = authErrorMessage(error, "Amalni bajarib bo‘lmadi. Qayta urinib ko‘ring.");
+      const fieldErrors = authFieldErrorsFromServer(error, authMode, authStage, authForm, message);
+      if (Object.keys(fieldErrors).length) {
+        setAuthFieldErrors((current) => ({ ...current, ...fieldErrors }));
+        setAuthError("");
+      } else {
+        setAuthError(message);
+      }
     } finally {
       setAuthBusy(false);
     }
@@ -454,7 +557,12 @@ export default function App() {
 
   async function requestPasswordReset() {
     const destination = authForm.identity.trim();
-    if (!destination) { setAuthError("Avval email yoki telefon raqamingizni kiriting."); return; }
+    const identityError = validateAuthField("identity", "login", "identity", authForm);
+    if (identityError) {
+      setAuthFieldErrors({ identity: identityError });
+      setAuthError("");
+      return;
+    }
     setAuthBusy(true);
     setAuthError("");
     try {
@@ -903,9 +1011,9 @@ export default function App() {
   if (!authReady) return <div className="boot-screen"><div className="boot-orb"><Sparkles size={23} /><span /></div><p>Navo AI tayyorlanmoqda</p></div>;
   if (!user) return <>
     <Suspense fallback={null}><SceneEffects /></Suspense>
-    <AuthScreen mode={authMode} stage={authStage} busy={authBusy} error={authError} notice={authNotice} demoCode={demoCode} form={authForm} config={config}
-      onMode={(mode) => { setAuthMode(mode); setAuthStage("identity"); setVerificationTarget(""); setAuthError(""); setAuthNotice(""); setDemoCode(""); }}
-      onChange={(key, value) => setAuthForm((current) => ({ ...current, [key]: value }))}
+    <AuthScreen mode={authMode} stage={authStage} busy={authBusy} error={authError} fieldErrors={authFieldErrors} notice={authNotice} demoCode={demoCode} form={authForm} config={config}
+      onMode={(mode) => { setAuthMode(mode); setAuthStage("identity"); setVerificationTarget(""); setAuthError(""); setAuthFieldErrors({}); setAuthNotice(""); setDemoCode(""); }}
+      onChange={changeAuthField} onBlurField={validateAuthFieldOnBlur}
       onSubmit={submitAuth} onReset={requestPasswordReset} onResend={resendCode} />
   </>;
 
@@ -914,11 +1022,11 @@ export default function App() {
       <Suspense fallback={null}><SceneEffects /></Suspense>
       <div className="ambient ambient-one" /><div className="ambient ambient-two" />
       <button className={`sidebar-scrim ${mobileSidebar ? "visible" : ""}`} aria-label="Menyuni yopish" onClick={() => setMobileSidebar(false)} />
-      <aside className={`sidebar glass-panel ${sidebarCollapsed ? "collapsed" : ""} ${mobileSidebar ? "mobile-open" : ""}`}>
+      <aside id="app-sidebar" className={`sidebar glass-panel ${sidebarCollapsed ? "collapsed" : ""} ${mobileSidebar ? "mobile-open" : ""}`}>
         <div className="sidebar-brand">
           <a className="brand" href="/" onClick={(event) => event.preventDefault()}><span className="brand-mark"><img alt="Navo AI" src={LOGO_SRC} /></span><span>Navo<span className="brand-accent">.ai</span></span></a>
-          <button className="icon-button sidebar-toggle" title="Yon panelni yig‘ish" onClick={() => setSidebarCollapsed((value) => !value)}>{sidebarCollapsed ? <PanelLeftOpen size={17} /> : <PanelLeftClose size={17} />}</button>
-          <button className="icon-button mobile-close" title="Menyuni yopish" onClick={() => setMobileSidebar(false)}><X size={18} /></button>
+          <button className="icon-button sidebar-toggle" type="button" aria-label="Yon panelni yig‘ish" aria-controls="app-sidebar" aria-expanded={!sidebarCollapsed} title="Yon panelni yig‘ish" onClick={() => setSidebarCollapsed(true)}><PanelLeftClose size={17} /></button>
+          <button className="icon-button mobile-close" type="button" aria-label="Menyuni yopish" title="Menyuni yopish" onClick={() => setMobileSidebar(false)}><X size={18} /></button>
         </div>
         <button className="new-chat-button" onClick={startNewChat}><Plus size={17} /><span>Yangi suhbat</span><kbd>⌘ K</kbd></button>
         <label className="search-box"><Search size={15} /><input id="chat-search" value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Suhbatlarni izlash" /><kbd>⌘K</kbd></label>
@@ -944,9 +1052,10 @@ export default function App() {
           </div>
         </div>
       </aside>
+      {sidebarCollapsed && <button className="icon-button sidebar-reopen" type="button" aria-label="Yon panelni kengaytirish" aria-controls="app-sidebar" aria-expanded="false" title="Yon panelni kengaytirish" onClick={() => setSidebarCollapsed(false)}><PanelLeftOpen size={17} /></button>}
 
       <section className="main-panel">
-        <header className="topbar"><div className="topbar-left"><button className="icon-button mobile-menu" onClick={() => setMobileSidebar(true)} title="Menyu"><Menu size={19} /></button><div className="model-select"><span className="model-spark"><Sparkles size={15} /></span><span>Navo 2.5</span><span className="model-divider" /><span className="online-dot" /><span className="model-light">Fast</span><ChevronDown size={14} /></div></div>
+        <header className="topbar"><div className="topbar-left"><button className="icon-button mobile-menu" type="button" aria-label="Yon menyuni ochish" aria-controls="app-sidebar" aria-expanded={mobileSidebar} onClick={() => setMobileSidebar(true)} title="Menyu"><Menu size={19} /></button><div className="model-select"><span className="model-spark"><Sparkles size={15} /></span><span>Navo 2.5</span><span className="model-divider" /><span className="online-dot" /><span className="model-light">Fast</span><ChevronDown size={14} /></div></div>
           <div className="topbar-right">
             {searching
               ? <label className="topbar-search"><Search size={14} /><input ref={searchRef} value={messageQuery} onChange={(event) => setMessageQuery(event.target.value)} placeholder="Suhbat ichidan izlash..." /><span className="search-count">{messageQuery ? `${visibleMessages.length}/${messages.length}` : ""}</span><button type="button" title="Qidiruvni yopish" onClick={() => { setSearching(false); setMessageQuery(""); }}><X size={14} /></button></label>
@@ -1014,7 +1123,7 @@ export default function App() {
   );
 }
 
-function AuthScreen({ mode, stage, busy, error, notice, demoCode, form, onMode, onChange, onSubmit, onReset, onResend }) {
+function AuthScreen({ mode, stage, busy, error, fieldErrors, notice, demoCode, form, onMode, onChange, onBlurField, onSubmit, onReset, onResend }) {
   const resetting = mode === "reset";
   const loginOtp = mode === "login" && stage === "login_otp";
   const verifying = stage === "code" || loginOtp;
@@ -1043,11 +1152,11 @@ function AuthScreen({ mode, stage, busy, error, notice, demoCode, form, onMode, 
     <section className="auth-presentation"><a className="brand auth-brand" href="/"><span className="brand-mark"><img alt="Navo AI" src={LOGO_SRC} /></span><span>Navo<span className="brand-accent">.ai</span></span></a><div className="auth-story"><div className="welcome-badge"><span className="online-dot" /> AI BILAN YANGICHA ISHLANG</div><h1>Fikringizga<br /><span className="gradient-text">aniqlik bering.</span></h1><p>G‘oyalaringizni rejalarga, savollaringizni esa tushunarli javoblarga aylantiring.</p><div className="auth-feature-list"><div><ShieldCheck size={17} /> Xavfsiz akkaunt va maxfiy suhbatlar</div><div><FileText size={17} /> Hujjatlar, rasmlar va ko‘p turdagi fayllar</div><div><AudioLines size={17} /> O‘zbek tilidagi qulay AI yordamchi</div></div></div><div className="auth-footer">Yaxshi g‘oya — yaxshi savoldan boshlanadi.</div></section>
     <section className={`auth-side ${verifying ? "auth-verifying" : ""}`}><div className="auth-card glass-panel" role={verifying ? "dialog" : undefined} aria-modal={verifying ? "true" : undefined} aria-labelledby="auth-heading"><div className="auth-card-logo"><span className="brand-mark"><img alt="Navo AI" src={LOGO_SRC} /></span><span>Navo AI</span><span className="auth-card-secure"><ShieldCheck size={13} /> Xavfsiz</span></div><h2 id="auth-heading">{verifying ? (resetting ? "Parolni tasdiqlang" : loginOtp ? "Kirishni tasdiqlang" : mode === "google" ? "Google hisobini tasdiqlang" : "Hisobingizni tasdiqlang") : resetting ? "Parolni tiklash" : mode === "login" ? "Xush kelibsiz" : "Yangi hisob yarating"}</h2><p className="auth-card-subtitle">{verifying ? `Kod ${form.identity} manziliga yuborildi.` : resetting ? "Yangi parol o‘rnatish uchun tasdiqlash kodini kiriting." : mode === "login" ? "Hisobingizga kirib davom eting." : "Shaxsiy AI yordamchingizni hoziroq ishga tushiring."}</p>
       {!verifying && !resetting && <div className="auth-tabs"><button type="button" className={mode === "login" ? "active" : ""} onClick={() => onMode("login")}>Kirish</button><button type="button" className={mode === "register" ? "active" : ""} onClick={() => onMode("register")}>Ro‘yxatdan o‘tish</button></div>}
-      <form className="auth-form" onSubmit={onSubmit}>
-        {!verifying && <label className="field-label">Email yoki telefon<input required autoComplete="username" placeholder="ism@gmail.com yoki +998901234567" value={form.identity} onChange={(event) => onChange("identity", event.target.value)} /></label>}
-        {(!verifying || resetting) && <label className="field-label">{resetting ? "Yangi parol" : "Parol"}<div className="password-field"><input required minLength={8} autoComplete={resetting ? "new-password" : mode === "register" ? "new-password" : "current-password"} type={showPassword ? "text" : "password"} placeholder="Kamida 8 ta belgi" value={form.password} onChange={(event) => onChange("password", event.target.value)} /><button className="password-toggle" type="button" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? "Parolni yashirish" : "Parolni ko‘rsatish"} title={showPassword ? "Parolni yashirish" : "Parolni ko‘rsatish"}>{showPassword ? <EyeOff size={16} /> : <Eye size={16} />}</button></div></label>}
-        {mode === "register" && !verifying && <label className="field-label">Ism yoki nickname<input required minLength={2} maxLength={40} autoComplete="nickname" placeholder="Masalan, Dilshod" value={form.nickname} onChange={(event) => onChange("nickname", event.target.value)} /></label>}
-        {verifying && <><label className="field-label">6 xonali tasdiqlash kodi<input required autoFocus inputMode="numeric" pattern="[0-9]{6}" maxLength={6} placeholder="000000" value={form.code} onChange={(event) => onChange("code", event.target.value.replace(/\D/g, "").slice(0, 6))} /></label>{demoCode && <div className="demo-code-note">Sinov rejimidagi kodingiz: <strong>{demoCode}</strong></div>}<button className="text-action" type="button" disabled={busy || resendSeconds > 0} onClick={resendOtp}>{resendSeconds > 0 ? `Kodni qayta yuborish · ${cooldownLabel}` : "Kodni qayta yuborish"}</button></>}
+      <form className="auth-form" noValidate onSubmit={onSubmit}>
+        {!verifying && <label className="field-label">Email yoki telefon<input id="auth-identity" required autoComplete="username" aria-invalid={Boolean(fieldErrors.identity)} aria-describedby={fieldErrors.identity ? "auth-identity-error" : undefined} placeholder="ism@gmail.com yoki +998901234567" value={form.identity} onChange={(event) => onChange("identity", event.target.value)} onBlur={() => onBlurField("identity")} /><span className={`field-error ${fieldErrors.identity ? "is-visible" : ""}`} id="auth-identity-error" aria-live="polite">{fieldErrors.identity || ""}</span></label>}
+        {(!verifying || resetting) && <label className="field-label">{resetting ? "Yangi parol" : "Parol"}<div className="password-field"><input id="auth-password" required minLength={8} maxLength={128} autoComplete={resetting ? "new-password" : mode === "register" ? "new-password" : "current-password"} type={showPassword ? "text" : "password"} aria-invalid={Boolean(fieldErrors.password)} aria-describedby={fieldErrors.password ? "auth-password-error" : undefined} placeholder="Kamida 8 ta belgi" value={form.password} onChange={(event) => onChange("password", event.target.value)} onBlur={() => onBlurField("password")} /><button className="password-toggle" type="button" onClick={() => setShowPassword((value) => !value)} aria-label={showPassword ? "Parolni yashirish" : "Parolni ko‘rsatish"} title={showPassword ? "Parolni yashirish" : "Parolni ko‘rsatish"}>{showPassword ? <EyeOff size={16} /> : <Eye size={16} />}</button></div><span className={`field-error ${fieldErrors.password ? "is-visible" : ""}`} id="auth-password-error" aria-live="polite">{fieldErrors.password || ""}</span></label>}
+        {mode === "register" && !verifying && <label className="field-label">Ism yoki nickname<input id="auth-nickname" required minLength={2} maxLength={40} autoComplete="nickname" aria-invalid={Boolean(fieldErrors.nickname)} aria-describedby={fieldErrors.nickname ? "auth-nickname-error" : undefined} placeholder="Masalan, Dilshod" value={form.nickname} onChange={(event) => onChange("nickname", event.target.value)} onBlur={() => onBlurField("nickname")} /><span className={`field-error ${fieldErrors.nickname ? "is-visible" : ""}`} id="auth-nickname-error" aria-live="polite">{fieldErrors.nickname || ""}</span></label>}
+        {verifying && <><label className="field-label">6 xonali tasdiqlash kodi<input id="auth-code" required autoFocus inputMode="numeric" pattern="[0-9]{6}" maxLength={6} aria-invalid={Boolean(fieldErrors.code)} aria-describedby={fieldErrors.code ? "auth-code-error" : undefined} placeholder="000000" value={form.code} onChange={(event) => onChange("code", event.target.value.replace(/\D/g, "").slice(0, 6))} onBlur={() => onBlurField("code")} /><span className={`field-error ${fieldErrors.code ? "is-visible" : ""}`} id="auth-code-error" aria-live="polite">{fieldErrors.code || ""}</span></label>{demoCode && <div className="demo-code-note">Sinov rejimidagi kodingiz: <strong>{demoCode}</strong></div>}<button className="text-action" type="button" disabled={busy || resendSeconds > 0} onClick={resendOtp}>{resendSeconds > 0 ? `Kodni qayta yuborish · ${cooldownLabel}` : "Kodni qayta yuborish"}</button></>}
         {error && <p className="auth-feedback error-feedback" role="alert"><CircleHelp size={15} />{error}</p>}{notice && <p className="auth-feedback success-feedback"><Check size={15} />{notice}</p>}
         <button className="primary-button auth-submit" disabled={busy}>{busy ? <span className="button-spinner" /> : <>{verifying ? <ShieldCheck size={17} /> : mode === "login" ? <LogIn size={17} /> : <ArrowRight size={17} />}{resetting ? "Parolni yangilash" : verifying ? (mode === "google" || loginOtp ? "Tasdiqlash va kirish" : "Tasdiqlash") : mode === "login" ? "Kirish" : "Hisob yaratish"}</>}</button>
       </form>

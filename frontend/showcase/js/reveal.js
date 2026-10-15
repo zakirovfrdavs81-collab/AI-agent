@@ -32,12 +32,22 @@ export function init({ reduced }) {
       const card = element.matches("[data-tilt], .tilt");
       const target = card ? element.querySelector(".tilt-inner") || element : element;
       const direction = element.dataset.revealDirection || ["left", "right", "up"][index % 3];
+      const effect = element.dataset.revealEffect;
       const spinTargets = [...element.querySelectorAll("[data-reveal-spin]")];
-      const offset = {
+      const directionOffset = {
         left: { x: card ? -32 : -56, y: card ? 24 : 12, rotation: -1.5, rotationX: 4, rotationY: -8 },
         right: { x: card ? 32 : 56, y: card ? 24 : 12, rotation: 1.5, rotationX: 4, rotationY: 8 },
         up: { x: 0, y: card ? 32 : 42, rotation: 0, rotationX: -7, rotationY: 0 },
       }[direction] || { x: 0, y: 42, rotation: 0, rotationX: -7, rotationY: 0 };
+      const effectOffset = {
+        "fade-in": { x: 0, y: 0, rotation: 0, rotationX: 0, rotationY: 0 },
+        "fade-up": { x: 0, y: 42, rotation: 0, rotationX: -7, rotationY: 0 },
+        "scale-in": { x: 0, y: 0, rotation: 0, rotationX: 0, rotationY: 0 },
+        "slide-left": { x: -56, y: 12, rotation: -1.5, rotationX: 4, rotationY: -8 },
+        "slide-right": { x: 56, y: 12, rotation: 1.5, rotationX: 4, rotationY: 8 },
+      }[effect];
+      const offset = effectOffset || directionOffset;
+      const startScale = effect === "scale-in" ? 0.78 : effect === "fade-in" ? 1 : card ? 0.9 : 0.96;
       const delay = (index % 3) * 0.045;
       let played = false;
 
@@ -48,7 +58,7 @@ export function init({ reduced }) {
         rotation: offset.rotation,
         rotationX: offset.rotationX,
         rotationY: offset.rotationY,
-        scale: card ? 0.9 : 0.96,
+        scale: startScale,
         transformPerspective: card ? 900 : 700,
         transformOrigin: "50% 50%",
       });

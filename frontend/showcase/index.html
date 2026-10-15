@@ -51,7 +51,9 @@
         if (preloader) preloader.classList.add("is-done");
       };
       window.addEventListener("error", unlock, true);
-      window.setTimeout(unlock, 8000);
+      window.setTimeout(() => {
+        if (document.documentElement.dataset.ready !== "1") unlock();
+      }, 8000);
     </script>
   </head>
   <body class="font-sans antialiased">
@@ -64,6 +66,7 @@
 
     <!-- Fon: WebGL zarrachalar + panjara + donadorlik -->
     <div class="bg-scene" data-scene aria-hidden="true"></div>
+    <div class="bg-ambient" aria-hidden="true"></div>
     <div class="bg-grid" aria-hidden="true"></div>
     <div class="grain" aria-hidden="true"></div>
 
@@ -75,6 +78,7 @@
         </a>
         <nav class="hidden items-center gap-8 md:flex">
           <a class="nav-link" href="#imkoniyatlar">Imkoniyatlar</a>
+          <a class="nav-link" href="#navo-yadrosi">Navo yadrosi</a>
           <a class="nav-link" href="#jarayon">Ish jarayoni</a>
           <a class="nav-link" href="#natijalar">Natijalar</a>
         </nav>
@@ -104,7 +108,7 @@
             yordamchi. Ovoz bilan gaplashing, fayl yuklang va natijani bir zumda oling.
           </p>
 
-          <div class="mt-9 flex flex-wrap items-center gap-4" data-reveal data-reveal-on="load">
+          <div class="hero-cta mt-9 flex flex-wrap items-center gap-4" data-reveal data-reveal-on="load">
             <a class="btn btn-primary" href="/app/" data-app-link data-magnetic="0.3" data-cursor="Boshlash">
               Navo AI’ni ochish
               <span class="btn-icon" aria-hidden="true">→</span>
@@ -122,7 +126,7 @@
         </div>
 
         <div class="relative z-10 lg:w-[44%]" data-parallax="0.12">
-          <div class="tilt glass mx-auto max-w-[26rem] rounded-[26px] p-5 shadow-[0_40px_120px_rgba(0,0,0,.55)]" data-tilt="10" data-cursor="">
+          <div class="tilt hero-chat-card glass mx-auto max-w-[26rem] rounded-[26px] p-5 shadow-[0_40px_120px_rgba(0,0,0,.55)]" data-tilt="10" data-reveal data-reveal-on="load" data-reveal-direction="right" data-cursor="">
             <span class="tilt-glare" aria-hidden="true"></span>
             <div class="tilt-inner">
               <div class="mb-4 flex items-center gap-3">
@@ -135,16 +139,16 @@
               </div>
 
               <div class="flex flex-col gap-3 text-[.82rem]">
-                <p class="m-0 ml-auto max-w-[80%] rounded-2xl rounded-br-md bg-[rgba(123,107,238,.22)] px-4 py-3 text-[#e9e5ff]">
+                <p class="hero-chat-message hero-chat-user m-0 ml-auto max-w-[80%] rounded-2xl rounded-br-md bg-[rgba(123,107,238,.22)] px-4 py-3 text-[#e9e5ff]">
                   Bugungi uchrashuv uchun 5 punktdan iborat reja tuzib ber.
                 </p>
-                <div class="max-w-[92%] rounded-2xl rounded-bl-md border border-[rgba(154,148,200,.16)] bg-[rgba(255,255,255,.04)] px-4 py-3 text-[#cfcbdf]">
+                <div class="hero-chat-message hero-chat-answer max-w-[92%] rounded-2xl rounded-bl-md border border-[rgba(154,148,200,.16)] bg-[rgba(255,255,255,.04)] px-4 py-3 text-[#cfcbdf]">
                   <p class="m-0 mb-2 text-[.7rem] font-semibold tracking-[.14em] text-[#8ce4ce] uppercase">Navo AI</p>
                   <span class="block">1. Maqsad va natijani bir jumlada yozamiz.</span>
                   <span class="block">2. Har bir punkt uchun mas’ul va muddat.</span>
                   <span class="block">3. Eng xatarli joy — bog‘liqliklar ro‘yxati.</span>
                 </div>
-                <div class="flex items-center gap-2 text-[.7rem] text-[#7f7c96]">
+                <div class="hero-chat-message hero-chat-status flex items-center gap-2 text-[.7rem] text-[#7f7c96]">
                   <span class="inline-block h-1.5 w-1.5 animate-pulse rounded-full bg-[#8ce4ce]"></span>
                   Yozmoqda…
                 </div>
@@ -177,6 +181,44 @@
             <span class="display text-[1.5rem] opacity-80 text-[#8ce4ce]">✳</span>
             <span class="display text-[1.5rem] whitespace-nowrap text-[#eae8f5] opacity-80">Statistika paneli</span>
             <span class="display text-[1.5rem] opacity-80 text-[#7b6bee]">✳</span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= 3D NAVO YADROSI ================= -->
+      <section class="core-section relative overflow-hidden py-20 sm:py-28" id="navo-yadrosi" aria-labelledby="core-title">
+        <div class="core-section-glow core-section-glow-violet" aria-hidden="true"></div>
+        <div class="core-section-glow core-section-glow-mint" aria-hidden="true"></div>
+        <div class="mx-auto grid w-full max-w-[1240px] items-center gap-8 px-5 sm:px-8 lg:grid-cols-[.9fr_1.1fr]">
+          <div class="relative z-10 max-w-[34rem]">
+            <span class="eyebrow" data-reveal><span class="dot-live"></span> Navo AI yadrosi</span>
+            <h2 class="display mt-6 text-[clamp(2rem,4.6vw,3.2rem)]" id="core-title" data-reveal data-reveal-effect="fade-up">
+              G‘oyangizga <span class="gradient-text">harakat beramiz.</span>
+            </h2>
+            <p class="mt-5 text-[.95rem] leading-relaxed text-[#9c99b4]" data-reveal data-reveal-effect="fade-in">
+              Har bir savolni ravshan javobga aylantiradigan Navo AI markazini 360° ko‘ring.
+              Yadro sekin aylanadi va sichqoncha harakatiga nozik javob beradi.
+            </p>
+            <div class="mt-8" data-reveal data-reveal-effect="fade-up">
+              <a class="btn btn-primary" href="/app/" data-app-link data-magnetic="0.26">
+                Navo AI bilan boshlash <span class="btn-icon" aria-hidden="true">→</span>
+              </a>
+            </div>
+          </div>
+          <div class="core-stage" data-core-stage data-parallax="0.08" aria-label="Aylanayotgan Navo AI 3D yadrosi">
+            <div class="core-backdrop" aria-hidden="true">
+              <span class="core-backdrop-orb"></span>
+              <span class="core-star core-star-one"></span>
+              <span class="core-star core-star-two"></span>
+              <span class="core-star core-star-three"></span>
+            </div>
+            <div class="core-fallback" aria-hidden="true">
+              <span class="core-fallback-ring core-fallback-ring-one"></span>
+              <span class="core-fallback-ring core-fallback-ring-two"></span>
+              <span class="core-fallback-crystal"><img src="/showcase/assets/logo.svg" alt="" width="50" height="50" /></span>
+            </div>
+            <div class="core-canvas" data-core-scene aria-hidden="true"></div>
+            <span class="sr-only">Navo AI’ni ifodalovchi kristall yadro sekin va uzluksiz 360 daraja aylanadi.</span>
           </div>
         </div>
       </section>
@@ -297,28 +339,28 @@
 
           <div class="gallery-viewport mt-12 -mx-5 px-5 sm:-mx-8 sm:px-8" data-gallery data-cursor="Surish" tabindex="0" aria-label="Ish jarayoni qadamlari">
             <div class="gallery-track" data-gallery-track>
-              <article class="gallery-card glass rounded-[26px] p-7">
+              <article class="gallery-card glass rounded-[26px] p-7" data-reveal data-reveal-direction="left">
                 <p class="display m-0 text-[3.2rem] text-[#7b6bee] opacity-70">01</p>
                 <h3 class="mt-4 mb-2 font-display text-[1.15rem] font-bold">So‘rang</h3>
                 <p class="m-0 text-[.88rem] leading-relaxed text-[#9c99b4]">
                   Savolni yozing yoki mikrofon orqali ayting. Navo o‘zbek tilini tabiiy tushunadi.
                 </p>
               </article>
-              <article class="gallery-card glass rounded-[26px] p-7">
+              <article class="gallery-card glass rounded-[26px] p-7" data-reveal data-reveal-direction="up">
                 <p class="display m-0 text-[3.2rem] text-[#8ce4ce] opacity-70">02</p>
                 <h3 class="mt-4 mb-2 font-display text-[1.15rem] font-bold">Fayllang</h3>
                 <p class="m-0 text-[.88rem] leading-relaxed text-[#9c99b4]">
                   Hujjat, jadval yoki rasm qo‘shsangiz — Navo ularni ham o‘qib, hisobga oladi.
                 </p>
               </article>
-              <article class="gallery-card glass rounded-[26px] p-7">
+              <article class="gallery-card glass rounded-[26px] p-7" data-reveal data-reveal-direction="up">
                 <p class="display m-0 text-[3.2rem] text-[#a99bfa] opacity-70">03</p>
                 <h3 class="mt-4 mb-2 font-display text-[1.15rem] font-bold">Javob oling</h3>
                 <p class="m-0 text-[.88rem] leading-relaxed text-[#9c99b4]">
                   Tuzilgan, aniq javob bir necha soniyada tayyor bo‘ladi — kerak bo‘lsa ovoz bilan eshitib oling.
                 </p>
               </article>
-              <article class="gallery-card glass rounded-[26px] p-7">
+              <article class="gallery-card glass rounded-[26px] p-7" data-reveal data-reveal-direction="right">
                 <p class="display m-0 text-[3.2rem] text-[#7b6bee] opacity-70">04</p>
                 <h3 class="mt-4 mb-2 font-display text-[1.15rem] font-bold">Eksport</h3>
                 <p class="m-0 text-[.88rem] leading-relaxed text-[#9c99b4]">
@@ -334,19 +376,19 @@
       <section class="relative mx-auto w-full max-w-[1240px] px-5 pb-24 sm:px-8" id="natijalar">
         <div class="glass rounded-[28px] p-8 sm:p-12">
           <div class="grid gap-10 sm:grid-cols-2 lg:grid-cols-4">
-            <div data-reveal>
+            <div data-reveal data-reveal-effect="scale-in">
               <p class="stat-number gradient-text" data-count="30">30</p>
               <p class="mt-3 text-[.82rem] text-[#9c99b4]">Kunlik xabar limiti — har foydalanuvchi uchun bepul</p>
             </div>
-            <div data-reveal>
+            <div data-reveal data-reveal-effect="fade-up">
               <p class="stat-number gradient-text" data-count="6">6</p>
               <p class="mt-3 text-[.82rem] text-[#9c99b4]">Fayl turi: PDF, Word, Excel, matn, rasm va CSV</p>
             </div>
-            <div data-reveal>
+            <div data-reveal data-reveal-effect="slide-left">
               <p class="stat-number gradient-text" data-count="3">3</p>
               <p class="mt-3 text-[.82rem] text-[#9c99b4]">Kirish usuli: email, telefon va Google akkaunt</p>
             </div>
-            <div data-reveal>
+            <div data-reveal data-reveal-effect="slide-right">
               <p class="stat-number gradient-text" data-count="24" data-count-suffix="/7">24/7</p>
               <p class="mt-3 text-[.82rem] text-[#9c99b4]">Server uzluksiz ishlaydi; model almashsa zaxiraga o‘tadi</p>
             </div>
@@ -381,18 +423,18 @@
       <!-- ================= FOOTER ================= -->
       <footer class="relative border-t border-[rgba(154,148,200,.16)] py-10">
         <div class="mx-auto flex w-full max-w-[1240px] flex-wrap items-center justify-between gap-6 px-5 sm:px-8">
-          <div class="flex items-center gap-3">
+          <div class="flex items-center gap-3" data-reveal>
             <img class="h-8 w-8 rounded-[10px]" src="/showcase/assets/logo.svg" alt="Navo AI" width="32" height="32" />
             <div class="leading-tight">
               <p class="m-0 font-display text-[.95rem] font-bold">Navo<span class="text-[#a99bfa]">.ai</span></p>
               <p class="m-0 text-[.72rem] text-[#7f7c96]">O‘zbek tilidagi aqlli yordamchi</p>
             </div>
           </div>
-          <p class="m-0 max-w-[30rem] text-[.74rem] leading-relaxed text-[#6f6c88]">
+          <p class="m-0 max-w-[30rem] text-[.74rem] leading-relaxed text-[#6f6c88]" data-reveal>
             Bu sahifa — Navo AI ilovasining taqdimot sahifasi. Ilova FastAPI serverida
             <span class="text-[#9c99b4]" data-api-origin>shu sayt manzilida</span> ishlaydi.
           </p>
-          <p class="m-0 text-[.72rem] text-[#6f6c88]">© <span id="year">2026</span> Navo AI</p>
+          <p class="m-0 text-[.72rem] text-[#6f6c88]" data-reveal>© <span id="year">2026</span> Navo AI</p>
         </div>
       </footer>
     </main>

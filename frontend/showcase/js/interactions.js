@@ -10,6 +10,7 @@ import { API_ORIGIN } from "../../js/config.js";
 
 export function init({ reduced, coarse }) {
   const cleanups = [
+    customCursor(),
     magnetic({ reduced, coarse }),
     tiltCards({ reduced, coarse }),
   ].filter(Boolean);
@@ -19,10 +20,96 @@ export function init({ reduced, coarse }) {
   return () => cleanups.forEach((cleanup) => cleanup());
 }
 
+/** Standart cursorni yashirmaydigan, faqat hover/mouse qurilmalaridagi indikator. */
+function customCursor() {
+  const hasMousePointer = window.matchMedia("(any-hover: hover) and (any-pointer: fine)").matches;
+  if (!hasMousePointer || document.querySelector(".showcase-cursor")) return null;
+
+  const root = document.createElement("div");
+  root.className = "showcase-cursor";
+  root.setAttribute("aria-hidden", "true");
+  const dot = document.createElement("span");
+  dot.className = "showcase-cursor-dot";
+  const ring = document.createElement("span");
+  ring.className = "showcase-cursor-ring";
+  root.append(dot, ring);
+  document.body.appendChild(root);
+
+  const position = { x: 0, y: 0, ringX: 0, ringY: 0 };
+  let frame = 0;
+  let visible = false;
+  const reducedMotion = window.matchMedia("(prefers-reduced-motion: reduce)");
+
+  const render = () => {
+    frame = 0;
+    position.ringX += (position.x - position.ringX) * 0.38;
+    position.ringY += (position.y - position.ringY) * 0.38;
+    ring.style.transform = `translate3d(${position.ringX.toFixed(2)}px,${position.ringY.toFixed(2)}px,0) translate(-50%,-50%)`;
+    if (Math.abs(position.x - position.ringX) > 0.25 || Math.abs(position.y - position.ringY) > 0.25) {
+      frame = requestAnimationFrame(render);
+    }
+  };
+
+  const onMove = (event) => {
+    if (event.pointerType && event.pointerType !== "mouse") {
+      hide();
+      return;
+    }
+    position.x = event.clientX;
+    position.y = event.clientY;
+    dot.style.transform = `translate3d(${position.x}px,${position.y}px,0) translate(-50%,-50%)`;
+    const target = event.target instanceof Element ? event.target : null;
+    const interactive = target?.closest("a[href],button:not(:disabled),[role='button'],[data-tilt]");
+    const textEntry = !interactive && Boolean(target?.closest("input,textarea,select,[contenteditable='true']"));
+    root.classList.toggle("is-interactive", Boolean(interactive));
+    root.classList.toggle("is-text-entry", textEntry);
+    root.classList.add("is-visible");
+    visible = true;
+    if (reducedMotion.matches) {
+      position.ringX = position.x;
+      position.ringY = position.y;
+      ring.style.transform = dot.style.transform;
+      return;
+    }
+    if (!frame) frame = requestAnimationFrame(render);
+  };
+
+  const hide = (event) => {
+    if (event?.relatedTarget instanceof Node) return;
+    root.classList.remove("is-visible", "is-interactive", "is-text-entry");
+    visible = false;
+    cancelAnimationFrame(frame);
+    frame = 0;
+  };
+
+  const onMotionChange = () => {
+    if (reducedMotion.matches && visible) {
+      position.ringX = position.x;
+      position.ringY = position.y;
+      ring.style.transform = dot.style.transform;
+      cancelAnimationFrame(frame);
+      frame = 0;
+    }
+  };
+
+  window.addEventListener("pointermove", onMove, { passive: true });
+  window.addEventListener("pointerout", hide);
+  window.addEventListener("blur", hide);
+  reducedMotion.addEventListener("change", onMotionChange);
+  return () => {
+    cancelAnimationFrame(frame);
+    window.removeEventListener("pointermove", onMove);
+    window.removeEventListener("pointerout", hide);
+    window.removeEventListener("blur", hide);
+    reducedMotion.removeEventListener("change", onMotionChange);
+    root.remove();
+  };
+}
+
 /** Tugmalar kursorga qarab tortiladi (magnit effekt). */
 function magnetic({ reduced, coarse }) {
   if (reduced || coarse) return;
-  const nodes = [...document.querySelectorAll("[data-magnetic]")];
+  const nodes = [...document.querySelectorAll("[data-magnetic]:not(.btn)")];
   if (!nodes.length) return;
 
   const items = nodes.map((element) => ({
@@ -102,9 +189,11 @@ function magnetic({ reduced, coarse }) {
 /** Kartalar kursor ostida 3D burchak oladi (tilt) + yorug'lik dog'i. */
 function tiltCards({ reduced, coarse }) {
   if (reduced || coarse) return;
-  const cleanups = [];
-  document.querySelectorAll(".tilt, [data-tilt], [data-magnetic]").forEach((card) => {
-    const strength = Number(card.dataset.tilt) || (card.matches(".btn") ? 3 : 8);
+  const items = [];
+  document.querySelectorAll(".tilt, [data-tilt], [data-magnetic]:not(.btn)").forEach((card) => {
+    const strength = Number(card.dataset.tilt) || 8;
+    const item = { card, strength, x: 0, y: 0, targetX: 0, targetY: 0, hovering: false };
+    items.push(item);
 
     const onMove = (event) => {
       if (event.pointerType && event.pointerType !== "mouse") return;
@@ -114,40 +203,72 @@ function tiltCards({ reduced, coarse }) {
       const py = (event.clientY - box.top) / box.height;
       // Karta tashqarisida bo'lsa (masalan kursor hali kelmagan bo'lsa) effekt qo'llanmaydi
       if (px < -0.12 || px > 1.12 || py < -0.12 || py > 1.12) {
-        reset();
+        item.targetX = 0;
+        item.targetY = 0;
         return;
       }
       card.style.setProperty("--mx", `${(px * 100).toFixed(2)}%`);
       card.style.setProperty("--my", `${(py * 100).toFixed(2)}%`);
-      card.style.transform =
-        `perspective(950px) rotateY(${((px - 0.5) * strength * 2).toFixed(2)}deg) ` +
-        `rotateX(${(-(py - 0.5) * strength * 2).toFixed(2)}deg)` +
-        (card.matches(".btn") ? "" : " translateY(-4px)");
+      item.targetY = (px - 0.5) * strength * 2;
+      item.targetX = -(py - 0.5) * strength * 2;
+      schedule();
     };
 
-    const reset = () => {
-      card.style.transform = "";
+    const onEnter = () => {
+      item.hovering = true;
+      card.classList.add("is-tilting");
     };
-
-    const onEnter = () => card.classList.add("is-tilting");
     const onLeave = () => {
+      item.hovering = false;
+      item.targetX = 0;
+      item.targetY = 0;
       card.classList.remove("is-tilting");
-      reset();
+      schedule();
     };
     card.addEventListener("pointerenter", onEnter);
     card.addEventListener("pointermove", onMove);
     card.addEventListener("pointerleave", onLeave);
-    cleanups.push(() => {
+    item.cleanup = () => {
       card.removeEventListener("pointerenter", onEnter);
       card.removeEventListener("pointermove", onMove);
       card.removeEventListener("pointerleave", onLeave);
       card.classList.remove("is-tilting");
-      reset();
+      card.style.removeProperty("transform");
       card.style.removeProperty("--mx");
       card.style.removeProperty("--my");
-    });
+    };
   });
-  return () => cleanups.forEach((cleanup) => cleanup());
+
+  let frame = 0;
+  const animate = () => {
+    frame = 0;
+    let moving = false;
+    items.forEach((item) => {
+      item.x += (item.targetX - item.x) * 0.18;
+      item.y += (item.targetY - item.y) * 0.18;
+      const card = item.card;
+      if (Math.abs(item.targetX - item.x) > 0.04 || Math.abs(item.targetY - item.y) > 0.04) {
+        card.style.transform =
+          `perspective(950px) rotateY(${item.x.toFixed(2)}deg) rotateX(${item.y.toFixed(2)}deg)` +
+          (card.matches(".btn") ? "" : " translateY(-4px)");
+        moving = true;
+      } else if (!item.hovering) {
+        item.x = 0;
+        item.y = 0;
+        card.style.removeProperty("transform");
+      }
+    });
+    if (moving) frame = requestAnimationFrame(animate);
+  };
+
+  function schedule() {
+    if (!frame) frame = requestAnimationFrame(animate);
+  }
+
+  return () => {
+    if (frame) cancelAnimationFrame(frame);
+    items.forEach((item) => item.cleanup());
+  };
 }
 
 /** Gorizontal drag galereya: tortish + inersiya, tugmalar va klaviatura bilan boshqarish. */

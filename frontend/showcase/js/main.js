@@ -6,10 +6,11 @@
  */
 
 const LOADERS = {
+  interactions: () => import("./interactions.js"),
   scroll: () => import("./smooth-scroll.js"),
   reveal: () => import("./reveal.js"),
   scene: () => import("./scene.js"),
-  interactions: () => import("./interactions.js"),
+  core: () => import("./core.js"),
 };
 
 const context = {
@@ -38,6 +39,8 @@ async function boot() {
   const disposeEffects = () => {
     window.removeEventListener("pagehide", onPageHide);
     results.interactions?.();
+    results.scene?.destroy?.();
+    results.core?.destroy?.();
   };
   const onPageHide = (event) => {
     if (!event.persisted) disposeEffects();
