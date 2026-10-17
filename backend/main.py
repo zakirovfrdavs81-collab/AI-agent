@@ -37,7 +37,7 @@ import psycopg
 from dotenv import load_dotenv
 from fastapi import Cookie, FastAPI, HTTPException, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import FileResponse, RedirectResponse
+from fastapi.responses import FileResponse, HTMLResponse, RedirectResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 from pwdlib import PasswordHash
@@ -1115,6 +1115,20 @@ def frontend_page() -> Path:
 @app.get("/")
 async def index():
     return FileResponse(SHOWCASE / "index.html")
+
+
+@app.get("/privacy", response_class=HTMLResponse)
+async def privacy_policy():
+    return (
+        "<!doctype html><html lang=\"en\"><head><meta charset=\"utf-8\">"
+        "<meta name=\"viewport\" content=\"width=device-width,initial-scale=1\">"
+        "<title>Privacy Policy — Navo AI</title></head><body>"
+        "<main><h1>Privacy Policy</h1>"
+        "<p>Navo AI foydalanuvchi ma'lumotini qo'riqlab oladi. "
+        "Navo AI xat orqali tasdiqlash kodlarini, sessiya ma'lumotlarini "
+        "va foydalanuvchi shaxsiy ma'lumotlarini ishlatadi.</p>"
+        "</main></body></html>"
+    )
 
 
 @app.get("/app")

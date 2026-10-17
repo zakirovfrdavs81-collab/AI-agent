@@ -94,6 +94,21 @@ class ProductionSecurityTests(unittest.TestCase):
         self.assertIn("/assets/", application.text)
         self.assertEqual(application_slash.status_code, 200)
 
+    def test_privacy_policy_route_returns_requested_policy_as_html(self):
+        from starlette.testclient import TestClient
+
+        response = TestClient(main.app).get("/privacy")
+
+        self.assertEqual(response.status_code, 200)
+        self.assertIn("text/html", response.headers["content-type"])
+        self.assertIn("<h1>Privacy Policy</h1>", response.text)
+        self.assertIn(
+            "Navo AI foydalanuvchi ma'lumotini qo'riqlab oladi. "
+            "Navo AI xat orqali tasdiqlash kodlarini, sessiya ma'lumotlarini "
+            "va foydalanuvchi shaxsiy ma'lumotlarini ishlatadi.",
+            response.text,
+        )
+
     def test_api_routes_take_precedence_over_frontend_fallback(self):
         from starlette.testclient import TestClient
 
