@@ -108,7 +108,7 @@ ENVIRONMENT = (
 def is_production() -> bool:
     if ENVIRONMENT in {"production", "prod"}:
         return True
-    origin = (os.getenv("APP_ORIGIN") or "").strip().lower()
+    origin = (os.getenv("APP_ORIGIN") or os.getenv("RENDER_EXTERNAL_URL") or "").strip().lower()
     if origin.startswith("https://") and not ("localhost" in origin or "127.0.0.1" in origin):
         return True
     return False
@@ -255,6 +255,14 @@ async def security_headers(request: Request, call_next):
     return response
 
 
+class SQLiteConnection(sqlite3.Connection):
+    def __exit__(self, exception_type, exception, traceback):
+        try:
+            return super().__exit__(exception_type, exception, traceback)
+        finally:
+            self.close()
+
+
 class PostgreSQLConnection:
     def __init__(self, connection):
         self.connection = connection
@@ -291,7 +299,7 @@ def db():
             connect_timeout=15,
         )
         return PostgreSQLConnection(connection)
-    connection = sqlite3.connect(DB, timeout=15)
+    connection = sqlite3.connect(DB, timeout=15, factory=SQLiteConnection)
     connection.row_factory = sqlite3.Row
     return connection
 
@@ -329,7 +337,7 @@ def recover_corrupted_sqlite_db() -> None:
         return
 
     try:
-        with sqlite3.connect(DB, timeout=15) as connection:
+        with sqlite3.connect(DB, timeout=15, factory=SQLiteConnection) as connection:
             connection.execute("PRAGMA schema_version")
         return
     except sqlite3.DatabaseError:
@@ -532,7 +540,11 @@ def channel_for(destination: str) -> str:
     if destination.startswith("+"):
         ready = bool(os.getenv("ESKIZ_EMAIL") and os.getenv("ESKIZ_PASSWORD"))
         return "sms" if ready else "demo"
-    return "email" if email_delivery_configured() else "demo"
+    return (
+        "email"
+        if email_delivery_configured() or is_production() or otp_mode() == "live"
+        else "demo"
+    )
 
 
 def dev_show_otp_enabled() -> bool:
@@ -891,7 +903,11 @@ def send_email(address: str, code: str) -> bool:
         elif provider == "brevo":
             response = httpx.post(
                 "https://api.brevo.com/v3/smtp/email",
-                headers={"accept": "application/json", "api-key": brevo_api_key},
+                headers={
+                    "accept": "application/json",
+                    "content-type": "application/json",
+                    "api-key": brevo_api_key,
+                },
                 json={
                     "sender": {"name": "Navo AI", "email": brevo_sender},
                     "to": [{"email": address}],
@@ -901,7 +917,29 @@ def send_email(address: str, code: str) -> bool:
                 },
                 timeout=20,
             )
-            response.raise_for_status()
+            response_body = safe_email_error_value(response.text, secrets_to_mask)
+            if 200 <= response.status_code < 300:
+                logging.getLogger("uvicorn.error").info(
+                    "Brevo email response: status=%s body=%s",
+                    response.status_code,
+                    response_body,
+                )
+            else:
+                if response.status_code == 401:
+                    category = "invalid_or_revoked_api_key"
+                elif response.status_code == 400:
+                    category = "invalid_request_or_unverified_sender"
+                elif response.status_code == 403:
+                    category = "IP_restriction_or_account_access"
+                else:
+                    category = "provider_rejected_request"
+                logging.getLogger("uvicorn.error").error(
+                    "Brevo email rejected: status=%s category=%s body=%s",
+                    response.status_code,
+                    category,
+                    response_body,
+                )
+                return False
         elif port == 465:
             with smtplib.SMTP_SSL(
                 host, port, timeout=20, context=ssl.create_default_context()
@@ -925,20 +963,47 @@ def send_email(address: str, code: str) -> bool:
 
 @app.on_event("startup")
 async def verify_email_transport_on_startup():
+    logger = logging.getLogger("uvicorn.error")
+    if is_production() and not DATABASE_URL:
+        logger.warning("SQLite vaqtinchalik, qayta ishga tushganda akkauntlar o'chadi")
+
     provider = get_email_provider()
-    if provider == "smtp":
+    if provider == "brevo":
+        api_key_configured = bool((os.getenv("BREVO_API_KEY") or "").strip())
+        sender_configured = bool((os.getenv("BREVO_SENDER_EMAIL") or "").strip())
+        logger.info(
+            "Email configuration: EMAIL_PROVIDER=brevo BREVO_API_KEY=%s BREVO_SENDER_EMAIL=%s",
+            "configured" if api_key_configured else "missing",
+            "configured" if sender_configured else "missing",
+        )
+        if not api_key_configured or not sender_configured:
+            missing_settings = [
+                name
+                for name, configured in (
+                    ("BREVO_API_KEY", api_key_configured),
+                    ("BREVO_SENDER_EMAIL", sender_configured),
+                )
+                if not configured
+            ]
+            logger.warning(
+                "Brevo email is not configured: missing %s",
+                ", ".join(missing_settings),
+            )
+        else:
+            logger.info("Email transport configured: EMAIL_PROVIDER=brevo (HTTPS API)")
+    elif provider == "smtp":
         await asyncio.to_thread(verify_smtp_connection)
-    elif provider in {"resend", "brevo"}:
+    elif provider == "resend":
         if email_delivery_configured():
-            logging.getLogger("uvicorn.error").info(
+            logger.info(
                 "Email transport verified: EMAIL_PROVIDER is %s (HTTP API configured)", provider
             )
         else:
-            logging.getLogger("uvicorn.error").warning(
+            logger.warning(
                 "Email transport warning: EMAIL_PROVIDER is %s but required API credentials are missing", provider
             )
     else:
-        logging.getLogger("uvicorn.error").warning(
+        logger.warning(
             "Email transport warning: EMAIL_PROVIDER '%s' is unsupported or not configured", provider
         )
 
@@ -1132,6 +1197,23 @@ async def logout(response: Response, request: Request, session: str | None = Coo
 
 # --- Ro'yxatdan o'tish va kirish --------------------------------------------
 
+def registration_email_failure_message() -> str:
+    if get_email_provider() == "brevo":
+        if not email_delivery_configured():
+            return (
+                "Hisob yaratildi, ammo tasdiqlash emaili yuborilmadi: "
+                "Brevo sozlamalarida BREVO_API_KEY yoki BREVO_SENDER_EMAIL yo‘q."
+            )
+        return (
+            "Hisob yaratildi, ammo Brevo tasdiqlash emailini yubormadi. "
+            "Render logidagi Brevo statusi va javobini tekshirib, kodni qayta yuboring."
+        )
+    return (
+        "Hisob yaratildi, ammo tasdiqlash emaili yuborilmadi. "
+        "Email xizmati sozlamalarini tekshirib, kodni qayta yuboring."
+    )
+
+
 @app.post("/api/auth/register")
 async def register(payload: RegisterInput, request: Request):
     destination = normalize(payload.email or payload.phone or "")
@@ -1172,20 +1254,22 @@ async def register(payload: RegisterInput, request: Request):
                     int(time.time()),
                 ),
             )
+    email_failure_message = None
     try:
         code, email_sent = await issue_code(destination, "register")
     except HTTPException as error:
-        if not is_email or error.status_code != 503:
+        if not is_email or error.status_code not in {502, 503}:
             raise
-        logging.error(f"Email error: {error.detail}")
+        logging.getLogger("uvicorn.error").error("Registration email delivery failed: %s", error.detail)
         code, email_sent = None, False
+        email_failure_message = error.detail
     channel = (
         "email"
         if is_email and not email_sent and code is None
         else channel_for(destination)
     )
     if channel == "email" and not email_sent:
-        message = "Hisob yaratildi, ammo email yuborilmadi. Email xizmati sozlamalarini tekshiring va kodni qayta yuboring."
+        message = email_failure_message or registration_email_failure_message()
     else:
         message = (
             f"Tasdiqlash kodi {channel_label(channel)} yuborildi."

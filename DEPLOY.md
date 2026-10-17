@@ -304,7 +304,7 @@ URI qiymatini buyruqlar tarixi/loglariga yozib qo'ymang. Ko'chirish tugagach, Re
 
 1. Render **Build Logs**'da `npm install`, `pip install` va `npm run build` muvaffaqiyatli tugaganini, **Deploy Logs**'da FastAPI `0.0.0.0` va Render bergan portda ishga tushganini tekshiring.
 2. `https://<Render-domeni>/api/health` so'rovi `200` va `{"status":"ok"}` qaytarishi kerak; `render.yaml` health check ham shu yo'lni ishlatadi.
-3. `DATABASE_URL` va `REQUIRE_DATABASE_URL=true` to'g'ri ekanini Render loglaridan tasdiqlang; ulanish xatosida URI/credential'ni log yoki chatga yubormang.
+3. `DATABASE_URL` va `REQUIRE_DATABASE_URL=true` to'g'ri ekanini Render loglaridan tasdiqlang; ulanish xatosida URI/credential'ni log yoki chatga yubormang. Agar `REQUIRE_DATABASE_URL` o'chirilgan bo'lsa va `DATABASE_URL` berilmagan bo'lsa, backend SQLite'ga o'tadi va production logida `SQLite vaqtinchalik, qayta ishga tushganda akkauntlar o'chadi` ogohlantirishi chiqadi. Render Free'da lokal SQLite doimiy saqlanmaydi: foydalanuvchilar, OTP kodlari va sessiyalar restart/deploy'dan keyin yo'qolishi mumkin. Doimiy ishlatish uchun PostgreSQL ulang.
 4. Sayt, ro'yxatdan o'tish va login'ni HTTPS orqali sinang. Production'da `DEV_SHOW_OTP=true` e'tiborga olinmaydi; OTP email orqali yuborilishi kerak.
 5. Brevo sender domeni va API kalitini tekshiring. Xatolik bo'lsa loglarda HTTP status va javob tafsiloti bo'ladi; API key/parol loglanmaydi.
 6. Google login ishlatilsa Google Console'dagi Authorized redirect URI `GOOGLE_REDIRECT_URI` bilan belgima-belgi mos bo'lsin. Brauzerda callbackdan keyin sessiya cookie'si `Secure` va `HttpOnly` bo'lishini tekshiring.
@@ -314,7 +314,7 @@ URI qiymatini buyruqlar tarixi/loglariga yozib qo'ymang. Ko'chirish tugagach, Re
 
 | Lokal | Render |
 | --- | --- |
-| `.env` qo'lda boshqariladi; `DATABASE_URL` bo'sh bo'lsa `backend/app.db` SQLite ishlatiladi. | Sirlar va domenlar Render Environment Variables'da saqlanadi; `REQUIRE_DATABASE_URL=true` sababli `DATABASE_URL` bo'lmasa server aniq xato bilan startni to'xtatadi. |
+| `.env` qo'lda boshqariladi; `DATABASE_URL` bo'sh bo'lsa `backend/app.db` SQLite ishlatiladi. | Sirlar va domenlar Render Environment Variables'da saqlanadi; `REQUIRE_DATABASE_URL=true` sababli `DATABASE_URL` bo'lmasa server aniq xato bilan startni to'xtatadi. Bu talab o'chirilgan bo'lsa SQLite vaqtinchalik ishlaydi va restart/deploy'da akkauntlar, kodlar hamda sessiyalar yo'qolishi mumkin. |
 | `npm start` uchun `PORT` berilmasa `5507`; `run.bat` frontendni oldin build qiladi. | Render `PORT` ni runtime'da beradi; build faqat `buildCommand` da, start esa tayyor `frontend/dist/` ni talab qiladi. |
 | `ENVIRONMENT=development` bo'lsa `DEV_SHOW_OTP=true` OTP'ni terminalga chiqaradi. | `ENVIRONMENT=production` da OTP terminalga chiqmaydi, hatto `DEV_SHOW_OTP=true` berilsa ham. |
 | HTTP local origin va local SQLite. | HTTPS reverse proxy, production cookie (`Secure`) va managed PostgreSQL; callback/CORS originlar domenga bog'liq. |

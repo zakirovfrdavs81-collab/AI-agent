@@ -1,6 +1,7 @@
 import sqlite3
 import tempfile
 import unittest
+from contextlib import closing
 from pathlib import Path
 from unittest.mock import patch
 
@@ -107,7 +108,7 @@ class PostgreSQLAdapterTests(unittest.TestCase):
                 main.init_db()
 
             self.assertTrue(db_path.exists())
-            with sqlite3.connect(db_path) as connection:
+            with closing(sqlite3.connect(db_path)) as connection:
                 tables = connection.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
             self.assertIn(("users",), tables)
             self.assertTrue(any(path.name.startswith("app.db.corrupt-") for path in Path(temp_dir).iterdir()))

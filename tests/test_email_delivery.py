@@ -4,10 +4,11 @@ import os
 import smtplib
 import sqlite3
 import unittest
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
 from fastapi import HTTPException, Response
+from pydantic import ValidationError
 from starlette.requests import Request
 
 from backend import main
@@ -19,7 +20,7 @@ def isolated_database():
     keeper = sqlite3.connect(uri, uri=True)
 
     def connect():
-        connection = sqlite3.connect(uri, uri=True)
+        connection = sqlite3.connect(uri, uri=True, factory=main.SQLiteConnection)
         connection.row_factory = sqlite3.Row
         return connection
 
@@ -290,7 +291,8 @@ class EmailDeliveryTests(unittest.TestCase):
             patch.object(main.smtplib, "SMTP_SSL") as smtp_ssl,
             patch.object(main.smtplib, "SMTP") as smtp,
         ):
-            post.return_value.raise_for_status.return_value = None
+            post.return_value.status_code = 201
+            post.return_value.text = '{"messageId":"test-message-id"}'
 
             sent = main.send_email("recipient@example.com", "123456")
 
@@ -302,43 +304,245 @@ class EmailDeliveryTests(unittest.TestCase):
         request = post.call_args.kwargs
         self.assertEqual(url, "https://api.brevo.com/v3/smtp/email")
         self.assertEqual(request["headers"]["api-key"], "test-api-key")
+        self.assertEqual(request["headers"]["content-type"], "application/json")
+        self.assertEqual(request["json"]["sender"]["name"], "Navo AI")
         self.assertEqual(
             request["json"]["sender"]["email"],
             "verified@example.com",
         )
         self.assertEqual(request["json"]["to"], [{"email": "recipient@example.com"}])
+        self.assertIn("Navo AI", request["json"]["subject"])
         self.assertIn("123456", request["json"]["textContent"])
         self.assertIn("123456", request["json"]["htmlContent"])
 
-    def test_brevo_http_failure_is_not_reported_as_sent(self):
+    def test_brevo_logs_response_status_and_sanitized_body(self):
         environment = {
             "EMAIL_PROVIDER": "brevo",
             "BREVO_API_KEY": "test-api-key",
             "BREVO_SENDER_EMAIL": "verified@example.com",
         }
         response = httpx.Response(
-            401,
-            content=b"invalid API key test-api-key for recipient@example.com",
+            201,
+            json={"messageId": "accepted recipient@example.com"},
             request=httpx.Request("POST", "https://api.brevo.com/v3/smtp/email"),
         )
         with (
             patch.dict(os.environ, environment, clear=True),
             patch.object(main.httpx, "post", return_value=response),
         ):
-            with self.assertLogs(level="ERROR") as captured:
+            with self.assertLogs("uvicorn.error", level="INFO") as captured:
                 sent = main.send_email("recipient@example.com", "123456")
 
-        self.assertFalse(sent)
+        self.assertTrue(sent)
         diagnostic = "\n".join(captured.output)
-        self.assertIn("HTTPStatusError", diagnostic)
-        self.assertIn("code=401", diagnostic)
-        self.assertIn("invalid API key", diagnostic)
+        self.assertIn("status=201", diagnostic)
+        self.assertIn("messageId", diagnostic)
         self.assertNotIn("test-api-key", diagnostic)
+        self.assertNotIn("verified@example.com", diagnostic)
         self.assertNotIn("recipient@example.com", diagnostic)
+        self.assertNotIn("123456", diagnostic)
+
+    def test_brevo_http_failures_are_classified_and_not_reported_as_sent(self):
+        environment = {
+            "EMAIL_PROVIDER": "brevo",
+            "BREVO_API_KEY": "test-api-key",
+            "BREVO_SENDER_EMAIL": "verified@example.com",
+        }
+        categories = {
+            401: "invalid_or_revoked_api_key",
+            400: "invalid_request_or_unverified_sender",
+            403: "IP_restriction_or_account_access",
+        }
+        for status, category in categories.items():
+            with self.subTest(status=status):
+                response = httpx.Response(
+                    status,
+                    json={
+                        "message": f"Brevo rejection test-api-key recipient@example.com 123456",
+                    },
+                    request=httpx.Request("POST", "https://api.brevo.com/v3/smtp/email"),
+                )
+                with (
+                    patch.dict(os.environ, environment, clear=True),
+                    patch.object(main.httpx, "post", return_value=response),
+                ):
+                    with self.assertLogs("uvicorn.error", level="ERROR") as captured:
+                        sent = main.send_email("recipient@example.com", "123456")
+
+                self.assertFalse(sent)
+                diagnostic = "\n".join(captured.output)
+                self.assertIn(f"status={status}", diagnostic)
+                self.assertIn(f"category={category}", diagnostic)
+                self.assertIn("Brevo rejection", diagnostic)
+                self.assertNotIn("test-api-key", diagnostic)
+                self.assertNotIn("recipient@example.com", diagnostic)
+                self.assertNotIn("123456", diagnostic)
 
     def test_brevo_requires_api_key_and_sender(self):
         with patch.dict(os.environ, {"EMAIL_PROVIDER": "brevo"}, clear=True):
             self.assertFalse(main.email_delivery_configured())
+
+    def test_production_registration_does_not_fall_back_to_hidden_demo_code(self):
+        environment = {
+            "EMAIL_PROVIDER": "brevo",
+            "BREVO_API_KEY": "",
+            "BREVO_SENDER_EMAIL": "",
+        }
+        with (
+            patch.dict(os.environ, environment, clear=True),
+            patch.object(main, "is_production", return_value=True),
+        ):
+            self.assertEqual(main.channel_for("user@example.com"), "email")
+
+    def test_register_reports_failed_email_without_claiming_it_was_sent(self):
+        environment = {
+            "EMAIL_PROVIDER": "brevo",
+            "BREVO_API_KEY": "test-api-key",
+            "BREVO_SENDER_EMAIL": "verified@example.com",
+        }
+        connection = MagicMock()
+        connection.__enter__.return_value = connection
+        request = Request({
+            "type": "http",
+            "method": "POST",
+            "path": "/api/auth/register",
+            "headers": [],
+            "client": ("127.0.0.1", 1234),
+            "server": ("testserver", 80),
+        })
+        with (
+            patch.dict(os.environ, environment, clear=True),
+            patch.object(main, "rate_limit"),
+            patch.object(main, "find_user", return_value=None),
+            patch.object(main.password_hash, "hash", return_value="hashed-password"),
+            patch.object(main, "db", return_value=connection),
+            patch.object(main, "issue_code", new=AsyncMock(return_value=(None, False))),
+        ):
+            result = asyncio.run(main.register(
+                main.RegisterInput(
+                    email="user@example.com",
+                    password="long-enough-password",
+                    nickname="Test User",
+                ),
+                request,
+            ))
+
+        self.assertEqual(result["channel"], "email")
+        self.assertFalse(result["email_sent"])
+        self.assertIn("emailini yubormadi", result["message"])
+        self.assertNotIn("email orqali yuborildi", result["message"])
+
+    def test_startup_logs_sqlite_and_brevo_configuration_without_values(self):
+        with (
+            patch.dict(
+                os.environ,
+                {
+                    "EMAIL_PROVIDER": "brevo",
+                    "BREVO_API_KEY": "do-not-log-this-key",
+                    "BREVO_SENDER_EMAIL": "private-sender@example.com",
+                },
+                clear=True,
+            ),
+            patch.object(main, "DATABASE_URL", ""),
+            patch.object(main, "is_production", return_value=True),
+        ):
+            with self.assertLogs("uvicorn.error", level="INFO") as captured:
+                asyncio.run(main.verify_email_transport_on_startup())
+
+        diagnostic = "\n".join(captured.output)
+        self.assertIn("SQLite vaqtinchalik, qayta ishga tushganda akkauntlar o'chadi", diagnostic)
+        self.assertIn("BREVO_API_KEY=configured", diagnostic)
+        self.assertIn("BREVO_SENDER_EMAIL=configured", diagnostic)
+        self.assertNotIn("do-not-log-this-key", diagnostic)
+        self.assertNotIn("private-sender@example.com", diagnostic)
+
+    def test_startup_warns_when_brevo_settings_are_missing(self):
+        with (
+            patch.dict(os.environ, {"EMAIL_PROVIDER": "brevo"}, clear=True),
+            patch.object(main, "DATABASE_URL", "postgresql://configured"),
+        ):
+            with self.assertLogs("uvicorn.error", level="WARNING") as captured:
+                asyncio.run(main.verify_email_transport_on_startup())
+
+        diagnostic = "\n".join(captured.output)
+        self.assertIn("BREVO_API_KEY", diagnostic)
+        self.assertIn("BREVO_SENDER_EMAIL", diagnostic)
+        self.assertIn("missing", diagnostic)
+
+    def test_verify_otp_rejects_missing_expired_wrong_and_blank_codes(self):
+        with isolated_database():
+            with self.assertRaises(HTTPException) as missing:
+                main.check_code("user@example.com", "123456", "register")
+            self.assertEqual(missing.exception.status_code, 400)
+            self.assertIn("topilmadi", missing.exception.detail)
+
+            with main.db() as connection:
+                connection.execute(
+                    "INSERT INTO codes VALUES (?, ?, ?, ?, ?)",
+                    ("user@example.com", "hash", int(main.time.time()) - 1, "register", 0),
+                )
+                connection.commit()
+            with self.assertRaises(HTTPException) as expired:
+                main.check_code("user@example.com", "123456", "register")
+            self.assertEqual(expired.exception.status_code, 400)
+            self.assertIn("muddati tugagan", expired.exception.detail)
+
+            with main.db() as connection:
+                connection.execute(
+                    "UPDATE codes SET expires_at=?, purpose=? WHERE destination=?",
+                    (int(main.time.time()) + 300, "register", "user@example.com"),
+                )
+                connection.commit()
+            with self.assertRaises(HTTPException) as wrong:
+                main.check_code("user@example.com", "123456", "reset")
+            self.assertEqual(wrong.exception.status_code, 400)
+
+            with self.assertRaises(ValidationError):
+                main.CodeInput(destination="user@example.com", code="", purpose="register")
+
+    def test_verify_otp_blank_code_is_http_422_before_handler_runs(self):
+        from starlette.testclient import TestClient
+
+        response = TestClient(main.app).post(
+            "/api/auth/verify-otp",
+            json={"destination": "user@example.com", "code": "", "purpose": "register"},
+        )
+
+        self.assertEqual(response.status_code, 422)
+
+    def test_login_401_is_unknown_user_or_bad_password_and_unverified_is_403(self):
+        request = Request({
+            "type": "http",
+            "method": "POST",
+            "path": "/api/auth/login",
+            "headers": [],
+            "client": ("127.0.0.1", 1234),
+            "server": ("testserver", 80),
+        })
+
+        async def call_login(user, password_valid):
+            with (
+                patch.object(main, "rate_limit"),
+                patch.object(main, "find_user", return_value=user),
+                patch.object(main.password_hash, "verify", return_value=password_valid),
+            ):
+                return await main.login(
+                    main.LoginInput(identity="user@example.com", password="provided-password"),
+                    Response(),
+                    request,
+                )
+
+        for user, password_valid in ((None, False), ({"password_hash": "hash"}, False)):
+            with self.subTest(user=user, password_valid=password_valid):
+                with self.assertRaises(HTTPException) as raised:
+                    asyncio.run(call_login(user, password_valid))
+                self.assertEqual(raised.exception.status_code, 401)
+
+        unverified_user = {"password_hash": "hash", "verified": False}
+        with self.assertRaises(HTTPException) as raised:
+            asyncio.run(call_login(unverified_user, True))
+        self.assertEqual(raised.exception.status_code, 403)
+        self.assertIn("hali tasdiqlanmagan", raised.exception.detail)
 
 
 if __name__ == "__main__":
