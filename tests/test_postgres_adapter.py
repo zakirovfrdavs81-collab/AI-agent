@@ -1,4 +1,7 @@
+import sqlite3
+import tempfile
 import unittest
+from pathlib import Path
 from unittest.mock import patch
 
 from backend import main
@@ -91,6 +94,23 @@ class PostgreSQLAdapterTests(unittest.TestCase):
         self.assertTrue(
             any(statement.startswith("ALTER TABLE users ADD COLUMN IF NOT EXISTS") for statement in statements)
         )
+
+    def test_init_db_recovers_from_corrupted_sqlite_database(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            db_path = Path(temp_dir) / "app.db"
+            db_path.write_bytes(b"\x00\x01\x02\x03not a valid sqlite database")
+
+            with (
+                patch.object(main, "DB", db_path),
+                patch.object(main, "DATABASE_URL", ""),
+            ):
+                main.init_db()
+
+            self.assertTrue(db_path.exists())
+            with sqlite3.connect(db_path) as connection:
+                tables = connection.execute("SELECT name FROM sqlite_master WHERE type='table'").fetchall()
+            self.assertIn(("users",), tables)
+            self.assertTrue(any(path.name.startswith("app.db.corrupt-") for path in Path(temp_dir).iterdir()))
 
 
 if __name__ == "__main__":

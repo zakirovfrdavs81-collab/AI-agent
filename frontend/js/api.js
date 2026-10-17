@@ -11,7 +11,8 @@ async function fetchGeminiResponse(prompt, attachment = null, apiBase = window.N
             method: "POST",
             credentials: "include",
             headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({
+            body: JSON.stringify(
+                {
                 prompt,
                 file_data: attachment?.data || null,
                 file_type: attachment?.type || null

@@ -18,6 +18,7 @@ import mimetypes
 import os
 import re
 import secrets
+import shutil
 import smtplib
 import sqlite3
 import ssl
@@ -323,7 +324,40 @@ def insert_id(connection, statement: str, parameters=()) -> int:
     return int(connection.execute(statement, parameters).lastrowid)
 
 
+def recover_corrupted_sqlite_db() -> None:
+    if DATABASE_URL or not DB.exists():
+        return
+
+    try:
+        with sqlite3.connect(DB, timeout=15) as connection:
+            connection.execute("PRAGMA schema_version")
+        return
+    except sqlite3.DatabaseError:
+        backup_path = DB.with_name(f"{DB.name}.corrupt-{int(time.time())}")
+        counter = 1
+        while backup_path.exists():
+            backup_path = DB.with_name(f"{DB.name}.corrupt-{int(time.time())}-{counter}")
+            counter += 1
+
+        try:
+            shutil.move(str(DB), str(backup_path))
+        except OSError:
+            try:
+                DB.unlink()
+            except OSError:
+                pass
+
+        logging.getLogger(__name__).warning(
+            "SQLite database %s is corrupted; backed up to %s and a fresh database will be created.",
+            DB,
+            backup_path,
+        )
+
+
 def init_db():
+    if not DATABASE_URL:
+        recover_corrupted_sqlite_db()
+
     with db() as connection:
         schema = """
             CREATE TABLE IF NOT EXISTS users (
