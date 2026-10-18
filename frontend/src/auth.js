@@ -17,6 +17,8 @@ export const requestPasswordReset = (request) => post("/auth/forgot", request);
 export const resetPassword = (request) => post("/auth/reset", request);
 export const logoutAccount = () => post("/auth/logout", {});
 
+export const googleLoginUrl = () => `${apiBase}/api/auth/google`;
+
 export function startGoogleLogin() {
-  window.location.assign(`${apiBase}/api/auth/google`);
+  window.location.assign(googleLoginUrl());
 }
