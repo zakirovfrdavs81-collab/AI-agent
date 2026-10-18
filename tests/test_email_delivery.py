@@ -46,157 +46,35 @@ def isolated_database():
 
 
 class EmailDeliveryTests(unittest.TestCase):
-    def test_smtp_keeps_implicit_tls_on_port_465(self):
+    def test_existing_smtp_environment_remains_default_and_sends_over_smtp(self):
         environment = {
-            "EMAIL_PROVIDER": "smtp",
             "SMTP_HOST": "smtp.gmail.com",
             "SMTP_PORT": "465",
             "SMTP_USER": "sender@example.com",
-            "SMTP_PASSWORD": "app \t-pass\nword",
+            "SMTP_PASSWORD": "app-password",
         }
         with (
             patch.dict(os.environ, environment, clear=True),
             patch.object(main.ssl, "create_default_context"),
             patch.object(main.smtplib, "SMTP_SSL") as smtp_ssl,
-            patch.object(main.smtplib, "SMTP") as smtp,
+            patch.object(main.httpx, "post") as http_post,
         ):
+            self.assertEqual(main.get_email_provider(), "smtp")
             sent = main.send_email("recipient@example.com", "123456")
 
         self.assertTrue(sent)
         smtp_ssl.assert_called_once()
-        self.assertEqual(smtp_ssl.call_args.args[:2], ("smtp.gmail.com", 465))
         smtp_ssl.return_value.__enter__.return_value.login.assert_called_once_with(
             "sender@example.com",
             "app-password",
         )
-        smtp.assert_not_called()
-
-    def test_startup_smtp_verification_uses_implicit_tls_on_port_465(self):
-        environment = {
-            "SMTP_HOST": "smtp.gmail.com",
-            "SMTP_PORT": "465",
-            "SMTP_USER": "sender@example.com",
-            "SMTP_PASSWORD": "app \t-pass\nword",
-        }
-        with (
-            patch.dict(os.environ, environment, clear=True),
-            patch.object(main.ssl, "create_default_context"),
-            patch.object(main.smtplib, "SMTP_SSL") as smtp_ssl,
-            patch.object(main.smtplib, "SMTP") as smtp,
-        ):
-            with self.assertLogs("uvicorn.error", level="INFO") as captured:
-                self.assertTrue(main.verify_smtp_connection())
-
-        smtp_ssl.assert_called_once()
-        smtp_ssl.return_value.__enter__.return_value.login.assert_called_once_with(
-            "sender@example.com",
-            "app-password",
-        )
-        smtp.assert_not_called()
-        self.assertIn("SMTP connection verified successfully", captured.output[0])
-
-    def test_startup_hook_runs_smtp_verification(self):
-        environment = {
-            "EMAIL_PROVIDER": "smtp",
-            "SMTP_HOST": "smtp.gmail.com",
-            "SMTP_PORT": "465",
-            "SMTP_USER": "sender@example.com",
-            "SMTP_PASSWORD": "app-password",
-        }
-        with (
-            patch.dict(os.environ, environment, clear=True),
-            patch.object(main, "verify_smtp_connection", return_value=True) as verify,
-        ):
-            asyncio.run(main.verify_email_transport_on_startup())
-
-        verify.assert_called_once_with()
-
-    def test_smtp_disconnect_is_not_reported_as_sent(self):
-        environment = {
-            "EMAIL_PROVIDER": "smtp",
-            "SMTP_HOST": "smtp.gmail.com",
-            "SMTP_PORT": "465",
-            "SMTP_USER": "sender@example.com",
-            "SMTP_PASSWORD": "app-password",
-        }
-        with (
-            patch.dict(os.environ, environment, clear=True),
-            patch.object(main.ssl, "create_default_context"),
-            patch.object(
-                main.smtplib,
-                "SMTP_SSL",
-                side_effect=smtplib.SMTPServerDisconnected("Connection unexpectedly closed"),
-            ),
-        ):
-            with self.assertLogs(level="ERROR") as captured:
-                sent = main.send_email("recipient@example.com", "123456")
-
-        self.assertFalse(sent)
-        diagnostic = "\n".join(captured.output)
-        self.assertIn("SMTPServerDisconnected", diagnostic)
-        self.assertNotIn("app-password", diagnostic)
-        self.assertNotIn("recipient@example.com", diagnostic)
-
-    def test_smtp_verification_logs_failure_without_password(self):
-        environment = {
-            "SMTP_HOST": "smtp.gmail.com",
-            "SMTP_PORT": "465",
-            "SMTP_USER": "sender@example.com",
-            "SMTP_PASSWORD": "app-password",
-        }
-        error = smtplib.SMTPAuthenticationError(
-            535,
-            b"5.7.8 authentication failed for app-password",
-        )
-        with (
-            patch.dict(os.environ, environment, clear=True),
-            patch.object(main.ssl, "create_default_context"),
-            patch.object(main.smtplib, "SMTP_SSL", side_effect=error),
-        ):
-            with self.assertLogs("uvicorn.error", level="ERROR") as captured:
-                self.assertFalse(main.verify_smtp_connection())
-
-        diagnostic = "\n".join(captured.output)
-        self.assertIn("code=535", diagnostic)
-        self.assertIn("5.7.8 authentication failed", diagnostic)
-        self.assertNotIn("app-password", diagnostic)
-
-    def test_smtp_error_logs_diagnostics_without_credentials(self):
-        environment = {
-            "EMAIL_PROVIDER": "smtp",
-            "SMTP_HOST": "smtp.gmail.com",
-            "SMTP_PORT": "465",
-            "SMTP_USER": "sender@example.com",
-            "SMTP_PASSWORD": "app-password",
-        }
-        error = smtplib.SMTPAuthenticationError(
-            535,
-            b"5.7.8 authentication failed for app-password",
-        )
-        with (
-            patch.dict(os.environ, environment, clear=True),
-            patch.object(main.ssl, "create_default_context"),
-            patch.object(main.smtplib, "SMTP_SSL", side_effect=error),
-        ):
-            with self.assertLogs(level="ERROR") as captured:
-                sent = main.send_email("recipient@example.com", "123456")
-
-        self.assertFalse(sent)
-        diagnostic = "\n".join(captured.output)
-        self.assertIn("code=535", diagnostic)
-        self.assertIn("5.7.8 authentication failed", diagnostic)
-        self.assertIn("SMTPAuthenticationError", diagnostic)
-        self.assertNotIn("app-password", diagnostic)
-        self.assertNotIn("recipient@example.com", diagnostic)
-        self.assertNotIn("123456", diagnostic)
+        http_post.assert_not_called()
 
     def test_auto_mode_sends_required_google_otp_using_email_not_eskiz(self):
         environment = {
-            "EMAIL_PROVIDER": "smtp",
-            "SMTP_HOST": "smtp.gmail.com",
-            "SMTP_PORT": "465",
-            "SMTP_USER": "sender@example.com",
-            "SMTP_PASSWORD": "app-password",
+            "EMAIL_PROVIDER": "brevo",
+            "BREVO_API_KEY": "test-api-key",
+            "BREVO_SENDER_EMAIL": "verified@example.com",
             "ESKIZ_EMAIL": "eskiz@example.com",
             "ESKIZ_PASSWORD": "eskiz-password",
             "OTP_MODE": "auto",
@@ -218,13 +96,11 @@ class EmailDeliveryTests(unittest.TestCase):
         send_email.assert_called_once_with("google-user@example.com", "123456")
         send_sms.assert_not_awaited()
 
-    def test_auto_mode_selects_smtp_for_email_registration(self):
+    def test_auto_mode_selects_brevo_for_email_registration(self):
         environment = {
-            "EMAIL_PROVIDER": "smtp",
-            "SMTP_HOST": "smtp.gmail.com",
-            "SMTP_PORT": "465",
-            "SMTP_USER": "sender@example.com",
-            "SMTP_PASSWORD": "app-password",
+            "EMAIL_PROVIDER": "brevo",
+            "BREVO_API_KEY": "test-api-key",
+            "BREVO_SENDER_EMAIL": "verified@example.com",
             "ESKIZ_EMAIL": "eskiz@example.com",
             "ESKIZ_PASSWORD": "eskiz-password",
             "OTP_MODE": "auto",
@@ -290,6 +166,8 @@ class EmailDeliveryTests(unittest.TestCase):
             patch.object(main.httpx, "post") as post,
             patch.object(main.smtplib, "SMTP_SSL") as smtp_ssl,
             patch.object(main.smtplib, "SMTP") as smtp,
+            patch.object(main.smtplib, "SMTP_SSL") as smtp_ssl,
+            patch.object(main.smtplib, "SMTP") as smtp,
         ):
             post.return_value.status_code = 201
             post.return_value.text = '{"messageId":"test-message-id"}'
@@ -299,21 +177,23 @@ class EmailDeliveryTests(unittest.TestCase):
         self.assertTrue(sent)
         smtp_ssl.assert_not_called()
         smtp.assert_not_called()
+        smtp_ssl.assert_not_called()
+        smtp.assert_not_called()
         post.assert_called_once()
         url = post.call_args.args[0]
         request = post.call_args.kwargs
         self.assertEqual(url, "https://api.brevo.com/v3/smtp/email")
         self.assertEqual(request["headers"]["api-key"], "test-api-key")
-        self.assertEqual(request["headers"]["content-type"], "application/json")
+        self.assertEqual(request["headers"]["Content-Type"], "application/json")
         self.assertEqual(request["json"]["sender"]["name"], "Navo AI")
         self.assertEqual(
             request["json"]["sender"]["email"],
             "verified@example.com",
         )
         self.assertEqual(request["json"]["to"], [{"email": "recipient@example.com"}])
-        self.assertIn("Navo AI", request["json"]["subject"])
-        self.assertIn("123456", request["json"]["textContent"])
+        self.assertEqual(request["json"]["subject"], "OTP")
         self.assertIn("123456", request["json"]["htmlContent"])
+        self.assertNotIn("textContent", request["json"])
 
     def test_brevo_logs_response_status_and_sanitized_body(self):
         environment = {

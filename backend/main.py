@@ -728,6 +728,10 @@ async def send_sms(phone: str, code: str):
             raise HTTPException(502, f"SMS yuborilmadi: {detail}")
 
 
+def get_email_provider() -> str:
+    return (os.getenv("EMAIL_PROVIDER") or "smtp").strip().lower()
+
+
 def get_smtp_config() -> tuple[str, str, str, int]:
     host = (os.getenv("SMTP_HOST") or "").strip().strip('"\'')
     user = (os.getenv("SMTP_USER") or os.getenv("SMTP_USERNAME") or "").strip().strip('"\'')
@@ -739,10 +743,6 @@ def get_smtp_config() -> tuple[str, str, str, int]:
     except ValueError:
         port = 465
     return host, user, password, port
-
-
-def get_email_provider() -> str:
-    return (os.getenv("EMAIL_PROVIDER") or "smtp").strip().lower()
 
 
 def email_delivery_configured() -> bool:
@@ -791,9 +791,7 @@ def log_email_error(action: str, error: Exception, secrets_to_mask: tuple[str, .
 
 
 def smtp_log_secrets(user: str, password: str) -> tuple[str, ...]:
-    raw_password = (
-        os.getenv("SMTP_PASSWORD") or os.getenv("SMTP_PASS") or ""
-    ).strip().strip('"\'')
+    raw_password = (os.getenv("SMTP_PASSWORD") or os.getenv("SMTP_PASS") or "").strip().strip('"\'')
     return tuple(secret for secret in (user, password, raw_password) if secret)
 
 
@@ -842,13 +840,12 @@ def send_email(address: str, code: str) -> bool:
 
     message = EmailMessage()
     message["Subject"] = "🔐 Navo AI tasdiqlash kodi"
-    sender_name = "Navo AI"
     if provider == "brevo":
-        from_address = formataddr((sender_name, brevo_sender))
+        from_address = formataddr(("Navo AI", brevo_sender))
     elif provider == "resend":
-        from_address = resend_sender if "<" in resend_sender else formataddr((sender_name, resend_sender))
+        from_address = resend_sender if "<" in resend_sender else formataddr(("Navo AI", resend_sender))
     else:
-        from_address = formataddr((sender_name, user))
+        from_address = formataddr(("Navo AI", user))
     message["From"] = from_address
     message["To"] = address
     text_body = (
@@ -884,16 +881,25 @@ def send_email(address: str, code: str) -> bool:
 </html>
 """
     message.add_alternative(html_body, subtype="html")
-    secrets_to_mask = (*smtp_log_secrets(user, password), brevo_api_key, brevo_sender, resend_api_key, resend_sender, address, code)
+    subject = "OTP"
+    secrets_to_mask = (
+        *smtp_log_secrets(user, password),
+        brevo_api_key,
+        brevo_sender,
+        resend_api_key,
+        resend_sender,
+        address,
+        code,
+    )
     try:
         if provider == "resend":
             response = httpx.post(
                 "https://api.resend.com/emails",
                 headers={"Authorization": f"Bearer {resend_api_key}", "Content-Type": "application/json"},
                 json={
-                    "from": from_address,
+                    "from": resend_sender,
                     "to": [address],
-                    "subject": str(message["Subject"]),
+                    "subject": subject,
                     "text": text_body,
                     "html": html_body,
                 },
@@ -905,14 +911,13 @@ def send_email(address: str, code: str) -> bool:
                 "https://api.brevo.com/v3/smtp/email",
                 headers={
                     "accept": "application/json",
-                    "content-type": "application/json",
+                    "Content-Type": "application/json",
                     "api-key": brevo_api_key,
                 },
                 json={
                     "sender": {"name": "Navo AI", "email": brevo_sender},
                     "to": [{"email": address}],
-                    "subject": str(message["Subject"]),
-                    "textContent": text_body,
+                    "subject": subject,
                     "htmlContent": html_body,
                 },
                 timeout=20,
@@ -940,13 +945,13 @@ def send_email(address: str, code: str) -> bool:
                     response_body,
                 )
                 return False
-        elif port == 465:
+        elif provider == "smtp" and port == 465:
             with smtplib.SMTP_SSL(
                 host, port, timeout=20, context=ssl.create_default_context()
             ) as server:
                 server.login(user, password)
                 server.send_message(message)
-        else:
+        elif provider == "smtp":
             with smtplib.SMTP(host, port, timeout=20) as server:
                 server.starttls(context=ssl.create_default_context())
                 server.login(user, password)

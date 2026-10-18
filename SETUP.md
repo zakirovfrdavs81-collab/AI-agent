@@ -109,25 +109,25 @@ FRONTEND_ORIGIN=http://127.0.0.1:5507
 GOOGLE_REDIRECT_URI=http://127.0.0.1:5507/api/auth/google/callback
 ESKIZ_EMAIL=...
 ESKIZ_PASSWORD=...
-SMTP_USER=...
-SMTP_PASSWORD=...
+EMAIL_PROVIDER=smtp
 SMTP_HOST=smtp.gmail.com
 SMTP_PORT=465
+SMTP_USER=...
+SMTP_PASSWORD=...
 DEV_SHOW_OTP=false
 OTP_MODE=live
 ```
 
 Telefon OTP uchun Eskiz akkaunti va SMS balansi kerak. Haqiqiy email OTP uchun
-Gmail App Password yarating, `.env` ichida `SMTP_HOST=smtp.gmail.com`,
-`SMTP_PORT=465`, Gmail manzili va App Password qiymatlarini to'ldiring va
-`DEV_SHOW_OTP=false` qoldiring. Email `Navo AI` nomidan `🔐 Navo AI tasdiqlash
-kodi` mavzusi bilan HTML va oddiy matn ko'rinishida yuboriladi. Kod 6 xonali,
-5 daqiqa amal qiladi; qayta yuborish orasida 60 soniya kutish bor.
-Port 465 implicit SSL (`SMTP_SSL`) bilan ishlatiladi; boshqa SMTP portlarda
-backend STARTTLS yoqadi. Backend start bo'lganda SMTP ulanishi va
-autentifikatsiyasini tekshiradi; natija server logida ko'rinadi. Email
-yuborishdagi xatoda SMTP kodi, javobi va xabar matni loglanadi, lekin parol,
-OTP kodi va qabul qiluvchi manzil yashiriladi. Gmail App Password ichiga
+lokal SMTP sozlamalari (`EMAIL_PROVIDER=smtp`, Gmail App Password) odatdagidek
+ishlaydi. Render Free'da Brevo'da sender email manzilini tasdiqlang va
+`EMAIL_PROVIDER=brevo`, `BREVO_API_KEY`, `BREVO_SENDER_EMAIL` ni kiriting;
+Brevo tanlanganda backend SMTP portiga ulanmaydi, faqat HTTPS API ishlatadi.
+Email Navo AI nomidan HTML ko'rinishida yuboriladi. Kod 6 xonali, 5 daqiqa
+amal qiladi; qayta yuborish orasida 60 soniya kutish bor. Backend ishga
+tushganda provider sozlamalarini tekshiradi; Brevo javobining statusi va
+maxfiy qiymatlarsiz tanasini loglaydi. API xatosida kalit, OTP kodi va
+qabul qiluvchi manzil yashiriladi.
 nusxalashda kirib qolgan bo'sh joylar/tablar avtomatik olib tashlanadi.
 
 Gemini modeli javob bermasa yoki sekinlashsa, backend sozlangan modelni
@@ -137,8 +137,8 @@ ichida javob bermasa, avtomatik ravishda keyingisiga o'tadi.
 
 Mahalliy sinovda OTPni ekranda ko'rsatish uchun `DEV_SHOW_OTP=true` qiling:
 oddiy ro'yxatdan o'tishda email/SMS yuborilmaydi va OTP terminal logiga
-chiqariladi. Google orqali kirish tasdiqlash kodi esa baribir SMTP orqali
-yuboriladi (sozlangan bo'lsa terminal logida ham ko'rinadi). Bu sozlamani
+chiqariladi. Google orqali kirish tasdiqlash kodi esa provider orqali
+yuboriladi. Bu sozlamani
 production'da yoqmang. Haqiqiy SMS/email uchun tegishli xizmat ma'lumotlarini
 kiriting, `DEV_SHOW_OTP=false`, `OTP_MODE=live` qoldiring. Shunda xizmat
 sozlanmagan bo'lsa demo-kod qaytarilmaydi va API aniq xato qaytaradi.
@@ -180,9 +180,9 @@ qaytaradi.
 Google OAuth muvaffaqiyatli tugagach, Google profilingizdagi
 tasdiqlangan emailga alohida 6 xonali OTP yuboriladi. Kod 5 daqiqa amal qiladi,
 qayta yuborish tugmasi 60 soniyadan so'ng faollashadi; kod tasdiqlanmaguncha
-sessiya ochilmaydi. Shu sabab Google OTP uchun Gmail SMTP sozlamalari majburiy
-va `DEV_SHOW_OTP=true` bu bosqichni chetlab o'tmaydi. Keyin backendni qayta
-ishga tushiring. Google login faqat credentiallar, SMTP va mos redirect URI bilan
+sessiya ochilmaydi. Shu sabab Google OTP uchun email provayderi sozlangan
+bo'lishi kerak; `DEV_SHOW_OTP=true` bu bosqichni chetlab o'tmaydi. Keyin backendni qayta
+ishga tushiring. Google login credentiallar, email provayderi va mos redirect URI bilan
 ishlaydi. Email/SMS/Google tasdiqlangach va login bo'lgach, backend 30 kunlik
 HttpOnly cookie o'rnatadi; JSON javobidagi
 `access_token` ham HS256 bilan imzolangan JWT bo'ladi. `SESSION_SECRET` uchun
@@ -212,7 +212,7 @@ backendni bitta origin'da yuritish uchun Render Web Service ishlating.
 Vercel'da alohida frontend deploy qilish yoki `VITE_API_URL` o'rnatish kerak emas.
 
 Render'da repository'ni Web Service/Blueprint qilib ulang. `render.yaml` build,
-start, health check va SMTP defaultlarini sozlaydi. Blueprint maxfiy qiymatlarni
+start va health check sozlaydi. Blueprint maxfiy qiymatlarni
 so'raydi; ularni faqat Render **Environment Variables** bo'limiga kiriting,
 GitHub yoki chatga yozmang:
 
@@ -221,9 +221,9 @@ GitHub yoki chatga yozmang:
 - `SESSION_SECRET` blueprint tomonidan avtomatik yaratiladi.
 - Google login uchun: `GOOGLE_CLIENT_ID`, `GOOGLE_CLIENT_SECRET`
 - SMS uchun: `ESKIZ_EMAIL`, `ESKIZ_PASSWORD`
-- Lokal Gmail SMTP uchun: `SMTP_HOST=smtp.gmail.com`, `SMTP_PORT=465`,
-  `SMTP_USER`, `SMTP_PASSWORD` (Google App Password). Lokal `.env`'da
-  `EMAIL_PROVIDER=smtp` qoldiring.
+- Render Free'da email uchun Brevo HTTPS API ishlating:
+  `EMAIL_PROVIDER=brevo`, `BREVO_API_KEY`, `BREVO_SENDER_EMAIL`.
+- Lokal SMTP sozlamalari `EMAIL_PROVIDER=smtp` bilan ishlashda davom etadi.
 
 Render Free blueprint `EMAIL_PROVIDER=brevo` bilan keladi. `/api/health`
 health check deploy muvaffaqiyatini tekshiradi; React va `/api/*` bitta Render
@@ -255,15 +255,9 @@ Render free servisi ichida bo'lgan bazani avtomatik yuklab olmaydi. Agar ishlab
 turgan Render hisoblarida kerakli ma'lumotlar bo'lsa, eski bazani avval alohida
 eksport/import qilish kerak. Connection string'ni repo yoki chatga joylamang.
 
-Mahalliy SMTP sinovida `smtp.gmail.com` ga TCP ulanishi ishladi, ammo 465
-(implicit TLS) va 587 (STARTTLS) portlarida `authentication` bosqichida
-`SMTPServerDisconnected: Connection unexpectedly closed` qaytdi. Demak portni
-almashtirishning o'zi sababni tuzatgani yo'q. Yangi App Password yarating yoki
-to'g'ri qiymat kiritilganini tekshiring; maxfiy qiymatni hech kimga yubormang.
-Backend xato turini va maxfiy qiymatlarsiz SMTP xabarini server logiga yozadi.
 Render'ning rasmiy hujjatiga ko'ra, **free web service** tashqi `25`, `465`,
 `587` SMTP portlariga chiqolmaydi ([Render free instance limitations](https://render.com/docs/free)).
-Shu sabab Render Free'da transactional email HTTPS API bilan yuboriladi:
+Shu sabab transactional email HTTPS API bilan yuboriladi:
 Brevo'da sender email manzilini tasdiqlang, so'ng `BREVO_API_KEY` va
 `BREVO_SENDER_EMAIL` qiymatlarini Render Environment Variables'ga kiriting.
 Brevo endpoint va `api-key` header'i haqida [rasmiy API hujjati](https://developers.brevo.com/docs/send-a-transactional-email)

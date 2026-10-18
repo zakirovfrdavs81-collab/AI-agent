@@ -45,7 +45,7 @@ Haqiqiy serverda `.env` faylini yarating va quyidagi o'zgaruvchilarni to'ldiring
 | `GOOGLE_CLIENT_ID` | Google OAuth Client ID | `...apps.googleusercontent.com` | Google auth uchun |
 | `GOOGLE_CLIENT_SECRET`| Google OAuth Client Secret | `GOCSPX-...` | Google auth uchun |
 | `GOOGLE_REDIRECT_URI` | Google OAuth qaytish manzili; avtomatik hosil qilinmaydi | `https://yourdomain.com/api/auth/google/callback` | Google auth uchun |
-| `EMAIL_PROVIDER` | Email provayderi (`smtp`, `resend`, `brevo`) | `smtp` | **Majburiy** |
+| `EMAIL_PROVIDER` | Email provayderi (`smtp`, `brevo` yoki `resend`) | `smtp` | Ixtiyoriy |
 | `SMTP_HOST` | SMTP server manzili | `smtp.gmail.com` | SMTP uchun |
 | `SMTP_PORT` | SMTP porti (465 = SSL, 587 = STARTTLS) | `465` | SMTP uchun |
 | `SMTP_USER` | SMTP login / email | `aloqa@yourdomain.com` | SMTP uchun |
@@ -237,8 +237,8 @@ Quyidagi amallarni faqat server egasi (administrator) o'z hisoblarida qo'lda baj
      - **Authorized redirect URIs**: `https://yourdomain.com/api/auth/google/callback`
 
 3. **Email xizmati**:
-   - **Gmail SMTP ishlatilsa**: Google hisobingizda 2 bosqichli tekshiruvni yoqing va maxsus *App Password* (Ilova paroli) olib, `.env` dagi `SMTP_PASSWORD` ga kiriting.
-   - **Chiquvchi SMTP portlari (465/587) hosting tomonidan yopiq bo'lsa**: `.env` da `EMAIL_PROVIDER=resend` yoki `EMAIL_PROVIDER=brevo` qilib, tegishli HTTP API kalitini kiriting (chunki HTTP 443 port hech qachon bloklanmaydi).
+   - Render Free'da `EMAIL_PROVIDER=brevo` belgilang, Brevo'da sender emailni tasdiqlang va `BREVO_API_KEY` hamda `BREVO_SENDER_EMAIL` ni sozlang. Bu tanlovda backend Brevo HTTPS API ishlatadi, SMTP portiga ulanmaydi.
+   - Lokal SMTP sozlamali o'rnatmalar avvalgidek ishlashi uchun `EMAIL_PROVIDER` ni ko'rsatmasangiz SMTP default bo'lib qoladi; SMTP tanlovini Render Free'da ishlatmang.
 
 4. **Xavfsizlik**:
    - `.env` faylini hech qachon Git'ga commit qilmang.
