@@ -1,6 +1,7 @@
 import asyncio
 import os
 import unittest
+from urllib.parse import parse_qs, urlsplit
 from unittest.mock import AsyncMock, MagicMock, patch
 
 from fastapi import HTTPException, Response
@@ -59,6 +60,32 @@ class ProductionSecurityTests(unittest.TestCase):
         with patch.dict(os.environ, environment, clear=False):
             with patch.object(main, "GOOGLE_REDIRECT_URI", ""):
                 self.assertFalse(main.google_ready())
+
+    def test_google_start_sends_and_logs_configured_redirect_uri(self):
+        from starlette.testclient import TestClient
+
+        redirect_uri = "https://ai-agent-1-ef3i.onrender.com/api/auth/google/callback"
+        connection = MagicMock()
+        connection.__enter__.return_value = connection
+        with (
+            patch.dict(
+                os.environ,
+                {"GOOGLE_CLIENT_ID": "test-client-id", "GOOGLE_CLIENT_SECRET": "test-client-secret"},
+                clear=False,
+            ),
+            patch.object(main, "GOOGLE_REDIRECT_URI", redirect_uri),
+            patch.object(main, "google_ready", return_value=True),
+            patch.object(main, "db", return_value=connection),
+            patch.object(main.secrets, "token_urlsafe", return_value="test-state"),
+            self.assertLogs("uvicorn.error", level="INFO") as captured,
+        ):
+            response = TestClient(main.app).get("/api/auth/google", follow_redirects=False)
+
+        query = parse_qs(urlsplit(response.headers["location"]).query)
+        self.assertEqual(response.status_code, 307)
+        self.assertEqual(query["redirect_uri"], [redirect_uri])
+        self.assertIn(f"Google OAuth Redirect URI: {redirect_uri}", captured.output[0])
+        self.assertNotIn("test-client-secret", "\n".join(captured.output))
 
     def test_cors_uses_only_explicit_origins_and_rejects_wildcard(self):
         self.assertEqual(

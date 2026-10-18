@@ -1606,6 +1606,10 @@ async def reset(payload: ResetInput, request: Request):
 
 @app.get("/api/auth/google")
 async def google_start():
+    logging.getLogger("uvicorn.error").info(
+        "Google OAuth Redirect URI: %s",
+        GOOGLE_REDIRECT_URI or "(not configured)",
+    )
     if not google_ready():
         return RedirectResponse(f"{FRONTEND_APP_URL}?auth_error=google_config")
     state = secrets.token_urlsafe(24)
@@ -1628,6 +1632,10 @@ async def google_start():
 @app.get("/api/auth/google/callback")
 @app.get("/api/auth/callback/google")
 async def google_callback(request: Request, code: str = "", state: str = ""):
+    logging.getLogger("uvicorn.error").info(
+        "Google OAuth callback Redirect URI: %s",
+        GOOGLE_REDIRECT_URI or "(not configured)",
+    )
     if not google_ready():
         return RedirectResponse(f"{FRONTEND_APP_URL}?auth_error=google_config")
     with db() as connection:
