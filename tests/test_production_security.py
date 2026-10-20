@@ -20,6 +20,20 @@ class ProductionSecurityTests(unittest.TestCase):
             with patch.object(main, "ENVIRONMENT", "development"):
                 self.assertFalse(main.is_production())
 
+    def test_production_requires_persistent_database(self):
+        with self.assertRaisesRegex(RuntimeError, "SQLite is disabled to prevent data loss"):
+            main.validate_database_configuration("", require_database_url=False, production=True)
+
+    def test_required_database_setting_rejects_missing_url_outside_production(self):
+        with self.assertRaisesRegex(RuntimeError, "DATABASE_URL is required"):
+            main.validate_database_configuration("", require_database_url=True, production=False)
+
+    def test_development_can_use_sqlite_and_configured_database_is_accepted(self):
+        main.validate_database_configuration("", require_database_url=False, production=False)
+        main.validate_database_configuration(
+            "postgresql://configured", require_database_url=True, production=True
+        )
+
     def test_production_session_secret_enforcement(self):
         insecure_secrets = ["", "generate-a-long-random-secret", "change-me", "short"]
         for bad_secret in insecure_secrets:

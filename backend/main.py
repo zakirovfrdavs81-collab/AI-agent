@@ -83,22 +83,6 @@ class SensitiveDataFilter(logging.Filter):
 for _logger_name in ("", "uvicorn", "uvicorn.error", "uvicorn.access"):
     logging.getLogger(_logger_name).addFilter(SensitiveDataFilter())
 
-DB = Path(os.getenv("NAVO_DB_PATH", str(BACKEND_ROOT / "app.db")))
-DATABASE_URL = normalize_database_url((os.getenv("DATABASE_URL") or "").strip())
-if (
-    (os.getenv("REQUIRE_DATABASE_URL") or "").strip().lower() in {"1", "true", "yes", "on"}
-    and not DATABASE_URL
-):
-    raise RuntimeError("DATABASE_URL is required for this deployment but is not configured.")
-SESSION_DAYS = 30
-CODE_TTL = 300
-CODE_RESEND_SECONDS = 60
-MAX_CODE_ATTEMPTS = 5
-HOST = (os.getenv("HOST") or "0.0.0.0").strip()
-try:
-    PORT = int((os.getenv("PORT") or "5507").strip())
-except ValueError:
-    PORT = 5507
 
 ENVIRONMENT = (
     os.getenv("ENVIRONMENT") or os.getenv("ENV") or os.getenv("NODE_ENV") or "development"
@@ -109,10 +93,31 @@ def is_production() -> bool:
     if ENVIRONMENT in {"production", "prod"}:
         return True
     origin = (os.getenv("APP_ORIGIN") or os.getenv("RENDER_EXTERNAL_URL") or "").strip().lower()
-    if origin.startswith("https://") and not ("localhost" in origin or "127.0.0.1" in origin):
-        return True
-    return False
+    return origin.startswith("https://") and not ("localhost" in origin or "127.0.0.1" in origin)
 
+
+def validate_database_configuration(database_url: str, require_database_url: bool, production: bool):
+    if (require_database_url or production) and not database_url:
+        raise RuntimeError(
+            "DATABASE_URL is required in production; SQLite is disabled to prevent data loss."
+        )
+
+
+DB = Path(os.getenv("NAVO_DB_PATH", str(BACKEND_ROOT / "app.db")))
+DATABASE_URL = normalize_database_url((os.getenv("DATABASE_URL") or "").strip())
+require_database_url = (os.getenv("REQUIRE_DATABASE_URL") or "").strip().lower() in {
+    "1", "true", "yes", "on"
+}
+validate_database_configuration(DATABASE_URL, require_database_url, is_production())
+SESSION_DAYS = 30
+CODE_TTL = 300
+CODE_RESEND_SECONDS = 60
+MAX_CODE_ATTEMPTS = 5
+HOST = (os.getenv("HOST") or "0.0.0.0").strip()
+try:
+    PORT = int((os.getenv("PORT") or "5507").strip())
+except ValueError:
+    PORT = 5507
 
 DAILY_MESSAGE_LIMIT = int(os.getenv("DAILY_MESSAGE_LIMIT", "30"))
 APP_ORIGIN = (
@@ -982,8 +987,7 @@ def send_email(address: str, code: str) -> bool:
 @app.on_event("startup")
 async def verify_email_transport_on_startup():
     logger = logging.getLogger("uvicorn.error")
-    if is_production() and not DATABASE_URL:
-        logger.warning("SQLite vaqtinchalik, qayta ishga tushganda akkauntlar o'chadi")
+    validate_database_configuration(DATABASE_URL, require_database_url, is_production())
 
     provider = get_email_provider()
     if provider == "brevo":

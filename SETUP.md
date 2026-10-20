@@ -246,9 +246,10 @@ Skript `NAVO_DB_PATH` ko'rsatgan lokal `backend/app.db` faylini ko'chiradi;
 faqat bo'sh PostgreSQL bazasiga yozadi va mavjud ma'lumotlarni ustidan
 yozmaydi. Muvaffaqiyatli bo'lgach, o'sha Neon connection string'ni Render'dagi
 `DATABASE_URL` secret'iga kiriting va deploy qiling. `REQUIRE_DATABASE_URL`
-yoqilganligi sabab Render'da bu secret bo'lmasa backend xato bilan to'xtaydi
-(ephemeral SQLite'ga jimgina o'tmaydi). Lokal `.env`-da `DATABASE_URL` bo'sh
-qolganda dastur avvalgidek SQLite'dan foydalanadi.
+yoqilganligi va production tekshiruvi sabab Render'da bu secret bo'lmasa backend
+xato bilan to'xtaydi (ephemeral SQLite'ga jimgina o'tmaydi). Shu sabab deploy
+oldidan Render Environment'da PostgreSQL URL borligini tekshiring. Lokal
+`.env`-da `DATABASE_URL` bo'sh qolganda dastur avvalgidek SQLite'dan foydalanadi.
 
 Migratsiya faqat sizning kompyuteringizdagi SQLite faylini ko'chiradi; hozirgi
 Render free servisi ichida bo'lgan bazani avtomatik yuklab olmaydi. Agar ishlab

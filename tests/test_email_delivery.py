@@ -312,7 +312,20 @@ class EmailDeliveryTests(unittest.TestCase):
         self.assertIn("emailini yubormadi", result["message"])
         self.assertNotIn("email orqali yuborildi", result["message"])
 
-    def test_startup_logs_sqlite_and_brevo_configuration_without_values(self):
+    def test_production_startup_refuses_sqlite_without_database_url(self):
+        with (
+            patch.dict(
+                os.environ,
+                {"EMAIL_PROVIDER": "brevo"},
+                clear=True,
+            ),
+            patch.object(main, "DATABASE_URL", ""),
+            patch.object(main, "is_production", return_value=True),
+        ):
+            with self.assertRaisesRegex(RuntimeError, "SQLite is disabled to prevent data loss"):
+                asyncio.run(main.verify_email_transport_on_startup())
+
+    def test_startup_logs_brevo_configuration_without_values(self):
         with (
             patch.dict(
                 os.environ,
@@ -323,14 +336,12 @@ class EmailDeliveryTests(unittest.TestCase):
                 },
                 clear=True,
             ),
-            patch.object(main, "DATABASE_URL", ""),
-            patch.object(main, "is_production", return_value=True),
+            patch.object(main, "DATABASE_URL", "postgresql://configured"),
         ):
             with self.assertLogs("uvicorn.error", level="INFO") as captured:
                 asyncio.run(main.verify_email_transport_on_startup())
 
         diagnostic = "\n".join(captured.output)
-        self.assertIn("SQLite vaqtinchalik, qayta ishga tushganda akkauntlar o'chadi", diagnostic)
         self.assertIn("BREVO_API_KEY=configured", diagnostic)
         self.assertIn("BREVO_SENDER_EMAIL=configured", diagnostic)
         self.assertNotIn("do-not-log-this-key", diagnostic)
