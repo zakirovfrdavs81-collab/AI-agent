@@ -6,9 +6,9 @@
 :root {
   --ink: #08090f;
   --panel: #12131f;
-  --violet: #7b6bee;
-  --violet-bright: #a99bfa;
-  --mint: #8ce4ce;
+  --violet: #5f7bea;
+  --violet-bright: #a9b8ff;
+  --mint: #56d6c3;
   --text: #eae8f5;
   --muted: #9c99b4;
   --line: rgba(154, 148, 200, .16);
@@ -104,7 +104,7 @@ html.lenis, html.lenis body { height: auto; }
 }
 
 .gradient-text {
-  background: linear-gradient(102deg, #fff 4%, var(--violet-bright) 46%, var(--mint) 96%);
+  background: linear-gradient(108deg, #fff 6%, var(--violet-bright) 48%, var(--mint) 96%);
   -webkit-background-clip: text;
   background-clip: text;
   color: transparent;
@@ -352,7 +352,7 @@ html.lenis, html.lenis body { height: auto; }
   place-items: center;
   border: 1px solid rgba(202, 195, 255, .65);
   border-radius: 28px;
-  background: linear-gradient(145deg, rgba(169, 155, 250, .28), rgba(52, 183, 171, .12));
+  background: linear-gradient(145deg, rgba(95, 123, 234, .3), rgba(40, 190, 177, .14));
   box-shadow: inset 0 1px 18px rgba(255, 255, 255, .18), 0 0 70px rgba(113, 91, 236, .42);
   backdrop-filter: blur(8px);
   transform: rotate(45deg) translateZ(36px);
@@ -402,7 +402,7 @@ html.lenis, html.lenis body { height: auto; }
   position: absolute;
   inset: 0;
   z-index: -1;
-  background: linear-gradient(105deg, var(--violet), var(--mint));
+  background: linear-gradient(110deg, #5b76e8, #36c9b5);
   transform: translateY(101%);
   transition: transform .55s var(--ease-out);
 }
@@ -419,7 +419,7 @@ html.lenis, html.lenis body { height: auto; }
 
 .btn-primary {
   border-color: transparent;
-  background: linear-gradient(105deg, var(--violet), var(--mint));
+  background: linear-gradient(110deg, #5b76e8, #36c9b5);
   color: #0a0b12;
 }
 
@@ -523,7 +523,7 @@ html.lenis, html.lenis body { height: auto; }
   position: absolute;
   left: 0; bottom: -6px;
   width: 100%; height: 1px;
-  background: linear-gradient(90deg, var(--violet-bright), var(--mint));
+  background: linear-gradient(90deg, #91a8ff, #48cfbd);
   transform: scaleX(0);
   transform-origin: left;
   transition: transform .45s var(--ease-out);

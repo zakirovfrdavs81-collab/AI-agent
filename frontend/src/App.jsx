@@ -43,6 +43,15 @@ const FONT_SIZES = [
   { id: "katta", label: "Katta" },
   { id: "kattaroq", label: "Juda katta" },
 ];
+const DEFAULT_SETTINGS = {
+  theme: "dark",
+  compact: false,
+  sound: false,
+  enterToSend: true,
+  font: "standart",
+  systemTheme: false,
+  readAloud: false,
+};
 const PROMPT_LIBRARY = [
   {
     group: "O‘rganish",
@@ -239,15 +248,6 @@ function authFieldErrorsFromServer(error, mode, stage, form, message) {
   return field ? { [field]: message } : {};
 }
 
-function readStorage(key, fallback) {
-  try {
-    const value = localStorage.getItem(key);
-    return value === null ? fallback : value;
-  } catch {
-    return fallback;
-  }
-}
-
 function formatBytes(bytes) {
   return bytes < 1024 * 1024 ? `${Math.max(1, Math.round(bytes / 1024))} KB` : `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
@@ -310,15 +310,9 @@ export default function App() {
   const [toast, setToast] = useState("");
   const [copiedId, setCopiedId] = useState(null);
   const [expandedSuggestion, setExpandedSuggestion] = useState(null);
-  const [settings, setSettings] = useState(() => ({
-    theme: readStorage("navo-theme", "dark"),
-    compact: readStorage("navo-compact", "false") === "true",
-    sound: readStorage("navo-sound", "false") === "true",
-    enterToSend: readStorage("navo-enter-send", "true") !== "false",
-    font: readStorage("navo-font", "standart"),
-    systemTheme: readStorage("navo-system-theme", "false") === "true",
-    readAloud: readStorage("navo-read-aloud", "false") === "true",
-  }));
+  const [settings, setSettings] = useState(() => ({ ...DEFAULT_SETTINGS }));
+  const [preferencesOwner, setPreferencesOwner] = useState("");
+  const [drafts, setDrafts] = useState({});
   const [usage, setUsage] = useState({ used: 0, limit: 0 });
   const [stats, setStats] = useState(null);
   const [dropActive, setDropActive] = useState(false);
@@ -336,14 +330,7 @@ export default function App() {
       return true;
     }
   });
-  const [starred, setStarred] = useState(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem("navo-starred") || "[]");
-      return Array.isArray(saved) ? saved : [];
-    } catch {
-      return [];
-    }
-  });
+  const [starred, setStarred] = useState([]);
   const searchRef = useRef(null);
   const workspaceRef = useRef(null);
   const recognitionRef = useRef(null);
@@ -384,14 +371,32 @@ export default function App() {
     setConversations(data.conversations || []);
   }, []);
 
+  const loadPreferences = useCallback(async (identity) => {
+    try {
+      const data = await apiRequest("/preferences");
+      setSettings({ ...DEFAULT_SETTINGS, ...data.settings });
+      setStarred(data.starred_conversations || []);
+      setDrafts(data.drafts || {});
+      setPreferencesOwner(identity.email || identity.phone || "");
+    } catch (error) {
+      setSettings({ ...DEFAULT_SETTINGS });
+      setStarred([]);
+      setDrafts({});
+      setPreferencesOwner("");
+      notify(`Sozlamalarni yuklab bo‘lmadi: ${error.message}`);
+    }
+  }, [notify]);
+
   useEffect(() => {
     let mounted = true;
     Promise.all([apiRequest("/me"), apiRequest("/config")])
-      .then(([session, options]) => {
+      .then(async ([session, options]) => {
         if (!mounted) return;
         setConfig(options);
         setUsage({ used: session.used_today || 0, limit: session.daily_limit || options?.daily_limit || 0 });
         if (session.authenticated) {
+          await loadPreferences(session.user);
+          if (!mounted) return;
           setUser(session.user);
           setProfile({ nickname: session.user.nickname || "", avatar: session.user.avatar || "" });
           loadConversations().catch((error) => notify(error.message));
@@ -429,25 +434,25 @@ export default function App() {
       .catch((error) => { if (mounted) setAuthError(error.message); })
       .finally(() => { if (mounted) setAuthReady(true); });
     return () => { mounted = false; };
-  }, [loadConversations, notify]);
+  }, [loadConversations, loadPreferences, notify]);
 
   useEffect(() => {
     const light = settings.systemTheme ? !systemDark : settings.theme === "light";
     document.documentElement.dataset.theme = light ? "light" : "dark";
     document.documentElement.dataset.compact = String(settings.compact);
     document.documentElement.dataset.font = settings.font || "standart";
-    try {
-      localStorage.setItem("navo-theme", settings.theme);
-      localStorage.setItem("navo-compact", String(settings.compact));
-      localStorage.setItem("navo-sound", String(settings.sound));
-      localStorage.setItem("navo-enter-send", String(settings.enterToSend));
-      localStorage.setItem("navo-font", settings.font || "standart");
-      localStorage.setItem("navo-system-theme", String(settings.systemTheme));
-      localStorage.setItem("navo-read-aloud", String(settings.readAloud));
-    } catch {
-      setToast("Brauzer sozlamalarni saqlashga ruxsat bermadi.");
-    }
   }, [settings, systemDark]);
+
+  useEffect(() => {
+    if (!preferencesOwner) return undefined;
+    const timer = window.setTimeout(() => {
+      apiRequest("/preferences", {
+        method: "PATCH",
+        body: JSON.stringify({ settings, starred_conversations: starred, drafts }),
+      }).catch((error) => notify(`Sozlamalarni serverda saqlab bo‘lmadi: ${error.message}`));
+    }, 500);
+    return () => window.clearTimeout(timer);
+  }, [preferencesOwner, settings, starred, drafts, notify]);
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: "smooth", block: "end" }); }, [messages, sending]);
 
@@ -503,13 +508,13 @@ export default function App() {
         setAuthForm((value) => ({ ...value, password: "", code: "" }));
       } else if (authMode === "register" && authStage === "code") {
         const result = await verifyOtp({ destination: verificationTarget, code: authForm.code.trim(), purpose: "register" });
-        finishLogin(result.user);
+        await finishLogin(result.user);
       } else if (authMode === "google" && authStage === "code") {
         const result = await verifyOtp({ destination: verificationTarget, code: authForm.code.trim(), purpose: "google" });
-        finishLogin(result.user);
+        await finishLogin(result.user);
       } else if (authMode === "login" && authStage === "login_otp") {
         const result = await verifyLoginOtp({ email: verificationTarget, code: authForm.code.trim() });
-        finishLogin(result.user);
+        await finishLogin(result.user);
       } else if (authMode === "register") {
         const identity = authForm.identity.trim();
         const result = await registerAccount({
@@ -551,7 +556,8 @@ export default function App() {
     }
   }
 
-  function finishLogin(nextUser) {
+  async function finishLogin(nextUser) {
+    await loadPreferences(nextUser);
     setUser(nextUser);
     setProfile({ nickname: nextUser.nickname || nextUser.name || "", avatar: nextUser.avatar || "" });
     setAuthError("");
@@ -610,6 +616,7 @@ export default function App() {
     try {
       await logoutAccount();
       setUser(null);
+      setPreferencesOwner("");
       setMessages([]);
       setConversationId(null);
       setConversations([]);
@@ -666,6 +673,7 @@ export default function App() {
 
   async function handleSend(event, override = {}) {
     event?.preventDefault();
+    const originalDraft = draft;
     const prompt = (override.prompt ?? draft).trim();
     const pendingFiles = override.prompt ? [] : [...files];
     if (sending || (!prompt && !pendingFiles.length)) return;
@@ -673,7 +681,8 @@ export default function App() {
     setChatError("");
     const userText = prompt || "Biriktirilgan fayl(lar)ni tahlil qilib bering.";
     const stamp = Math.floor(Date.now() / 1000);
-    setMessages((current) => [...current, { role: "user", content: userText, files: pendingFiles.map((file) => file.name), at: stamp }]);
+    const optimisticMessage = { role: "user", content: userText, files: pendingFiles.map((file) => file.name), at: stamp };
+    setMessages((current) => [...current, optimisticMessage]);
     if (!override.prompt) setDraft("");
     setFiles([]);
     try {
@@ -690,6 +699,11 @@ export default function App() {
       if (settings.sound) playSentSound();
       if (settings.readAloud) speakAnswer(result.text, "auto");
     } catch (error) {
+      setMessages((current) => current.filter((message) => message !== optimisticMessage));
+      if (!override.prompt) {
+        setDraft(originalDraft);
+        setFiles(pendingFiles);
+      }
       setChatError(error.message);
     } finally {
       setSending(false);
@@ -782,24 +796,13 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    try {
-      localStorage.setItem("navo-starred", JSON.stringify(starred));
-    } catch {
-      /* brauzer saqlashga ruxsat bermadi */
-    }
-  }, [starred]);
-
-  useEffect(() => {
-    setDraft(readStorage(`navo-draft-${conversationId || "new"}`, ""));
-  }, [conversationId]);
+    setDraft(drafts[String(conversationId || "new")] || "");
+  }, [conversationId, drafts]);
 
   useEffect(() => {
     const timer = window.setTimeout(() => {
-      try {
-        localStorage.setItem(`navo-draft-${conversationId || "new"}`, draft);
-      } catch {
-        /* brauzer saqlashga ruxsat bermadi */
-      }
+      const key = String(conversationId || "new");
+      setDrafts((current) => current[key] === draft ? current : { ...current, [key]: draft });
     }, 500);
     return () => window.clearTimeout(timer);
   }, [draft, conversationId]);

@@ -427,6 +427,13 @@ def init_db():
                 files_json TEXT NOT NULL DEFAULT '[]',
                 created_at INTEGER NOT NULL
             );
+            CREATE TABLE IF NOT EXISTS user_preferences (
+                user_id INTEGER PRIMARY KEY,
+                settings_json TEXT NOT NULL DEFAULT '{}',
+                starred_json TEXT NOT NULL DEFAULT '[]',
+                drafts_json TEXT NOT NULL DEFAULT '{}',
+                updated_at INTEGER NOT NULL DEFAULT 0
+            );
             CREATE INDEX IF NOT EXISTS conversation_messages_order
                 ON conversation_messages(conversation_id, id);
             """
@@ -455,6 +462,12 @@ class RegisterInput(BaseModel):
 class ProfileInput(BaseModel):
     nickname: str = Field(min_length=2, max_length=40)
     avatar: str | None = Field(default=None, max_length=700_000)
+
+
+class UserPreferencesInput(BaseModel):
+    settings: dict[str, str | bool] | None = None
+    starred_conversations: list[int] | None = Field(default=None, max_length=300)
+    drafts: dict[str, str] | None = None
 
 
 class LoginInput(BaseModel):
@@ -1921,7 +1934,13 @@ async def rename_conversation(conversation_id: int, payload: ConversationTitleIn
     if not title:
         raise HTTPException(422, "Suhbat nomi bo‘sh bo‘lmasligi kerak.")
     with db() as connection:
-        own_conversation(connection, user["id"], conversation_id)
+        conversation = connection.execute(
+            "SELECT user_id FROM conversations WHERE id=?", (conversation_id,)
+        ).fetchone()
+        if conversation and conversation["user_id"] != user["id"]:
+            raise HTTPException(404, "Suhbat topilmadi.")
+        if not conversation:
+            raise HTTPException(404, "Suhbat topilmadi.")
         connection.execute(
             "UPDATE conversations SET title=?, updated_at=? WHERE id=?",
             (title, int(time.time()), conversation_id),
@@ -1936,6 +1955,18 @@ async def delete_conversation(conversation_id: int, session: str | None = Cookie
         own_conversation(connection, user["id"], conversation_id)
         connection.execute("DELETE FROM conversation_messages WHERE conversation_id=?", (conversation_id,))
         connection.execute("DELETE FROM conversations WHERE id=?", (conversation_id,))
+        preferences = connection.execute(
+            "SELECT starred_json, drafts_json FROM user_preferences WHERE user_id=?",
+            (user["id"],),
+        ).fetchone()
+        if preferences:
+            starred = [item for item in json.loads(preferences["starred_json"]) if item != conversation_id]
+            drafts = json.loads(preferences["drafts_json"])
+            drafts.pop(str(conversation_id), None)
+            connection.execute(
+                "UPDATE user_preferences SET starred_json=?, drafts_json=?, updated_at=? WHERE user_id=?",
+                (json.dumps(starred), json.dumps(drafts), int(time.time()), user["id"]),
+            )
     return {"message": "Suhbat o‘chirildi."}
 
 
@@ -1953,6 +1984,112 @@ async def update_profile(payload: ProfileInput, session: str | None = Cookie(def
         )
         row = connection.execute("SELECT * FROM users WHERE id=?", (user["id"],)).fetchone()
     return {"user": public_user(row), "message": "Profil saqlandi."}
+
+
+@app.get("/api/preferences")
+async def get_preferences(session: str | None = Cookie(default=None)):
+    user = require_user(session)
+    with db() as connection:
+        row = connection.execute(
+            "SELECT settings_json, starred_json, drafts_json FROM user_preferences WHERE user_id=?",
+            (user["id"],),
+        ).fetchone()
+    return {
+        "settings": json.loads(row["settings_json"]) if row else {},
+        "starred_conversations": json.loads(row["starred_json"]) if row else [],
+        "drafts": json.loads(row["drafts_json"]) if row else {},
+    }
+
+
+@app.patch("/api/preferences")
+async def update_preferences(
+    payload: UserPreferencesInput,
+    session: str | None = Cookie(default=None),
+):
+    user = require_user(session)
+    with db() as connection:
+        existing = connection.execute(
+            "SELECT settings_json, starred_json, drafts_json FROM user_preferences WHERE user_id=?",
+            (user["id"],),
+        ).fetchone()
+        settings = json.loads(existing["settings_json"]) if existing else {}
+        starred = json.loads(existing["starred_json"]) if existing else []
+        drafts = json.loads(existing["drafts_json"]) if existing else {}
+
+        if payload.settings is not None:
+            setting_types = {
+                "theme": {"dark", "light"},
+                "compact": bool,
+                "sound": bool,
+                "enterToSend": bool,
+                "font": {"standart", "katta", "kattaroq"},
+                "systemTheme": bool,
+                "readAloud": bool,
+            }
+            for key, value in payload.settings.items():
+                if key not in setting_types:
+                    raise HTTPException(422, f"Noma’lum sozlama: {key}.")
+                expected = setting_types[key]
+                if (
+                    isinstance(expected, set) and value not in expected
+                    or expected is bool and type(value) is not bool
+                ):
+                    raise HTTPException(422, f"Sozlama qiymati yaroqsiz: {key}.")
+                settings[key] = value
+
+        if payload.starred_conversations is not None:
+            requested_starred = list(dict.fromkeys(payload.starred_conversations))
+            starred = []
+            for conversation_id in requested_starred:
+                conversation = connection.execute(
+                    "SELECT user_id FROM conversations WHERE id=?", (conversation_id,)
+                ).fetchone()
+                if conversation and conversation["user_id"] != user["id"]:
+                    raise HTTPException(404, "Suhbat topilmadi.")
+                if conversation:
+                    starred.append(conversation_id)
+
+        if payload.drafts is not None:
+            if len(payload.drafts) > 301 or sum(map(len, payload.drafts.values())) > 50_000:
+                raise HTTPException(422, "Qoralama hajmi saqlash chegarasidan oshdi.")
+            requested_drafts = dict(payload.drafts)
+            for key, value in list(requested_drafts.items()):
+                if key != "new":
+                    try:
+                        conversation_id = int(key)
+                    except ValueError as error:
+                        raise HTTPException(422, "Qoralama suhbat identifikatori yaroqsiz.") from error
+                    conversation = connection.execute(
+                        "SELECT user_id FROM conversations WHERE id=?", (conversation_id,)
+                    ).fetchone()
+                    if conversation and conversation["user_id"] != user["id"]:
+                        raise HTTPException(404, "Suhbat topilmadi.")
+                    if not conversation:
+                        requested_drafts.pop(key)
+                        continue
+                if len(value) > 20_000:
+                    raise HTTPException(422, "Bitta qoralama 20 000 belgidan oshmasligi kerak.")
+            drafts = requested_drafts
+
+        connection.execute(
+            "INSERT INTO user_preferences(user_id, settings_json, starred_json, drafts_json, updated_at) "
+            "VALUES (?, ?, ?, ?, ?) ON CONFLICT(user_id) DO UPDATE SET "
+            "settings_json=excluded.settings_json, starred_json=excluded.starred_json, "
+            "drafts_json=excluded.drafts_json, updated_at=excluded.updated_at",
+            (
+                user["id"],
+                json.dumps(settings),
+                json.dumps(starred),
+                json.dumps(drafts),
+                int(time.time()),
+            ),
+        )
+    return {
+        "settings": settings,
+        "starred_conversations": starred,
+        "drafts": drafts,
+        "message": "Sozlamalar saqlandi.",
+    }
 
 
 @app.get("/api/stats")

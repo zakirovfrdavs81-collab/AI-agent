@@ -277,8 +277,11 @@ qilib belgilash mumkin.
 ga qaytadi; noma'lum `/api/...` yo'llar esa API 404 sifatida qoladi. Lokal
 ishlashda `DATABASE_URL` bo'sh bo'lsa SQLite `NAVO_DB_PATH` manzilidan
 foydalanadi. Render'da `DATABASE_URL` Neon PostgreSQL'ga ulanadi, shuning uchun
-foydalanuvchi, sessiya, tasdiqlash kodi va suhbatlar web-servis restart/deploy
-qilinganda saqlanadi.
+foydalanuvchi, sessiya, tasdiqlash kodi, suhbatlar, foydalanuvchiga tegishli
+ko'rinish sozlamalari, yulduzlangan suhbatlar va qoralamalar web-servis
+restart/deploy qilinganda saqlanadi. Bu afzalliklar `/api/preferences` orqali
+saqlanadi; suhbat qoralamasi faqat egasi bo'lgan suhbat identifikatoriga
+bog'lanadi.
 
 Tekshirish uchun: `npm run build`, so'ng `npm start`;
 `http://127.0.0.1:5507/` landing page'ni,
