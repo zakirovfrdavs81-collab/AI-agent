@@ -1,15 +1,18 @@
 {
+  "id": "/app/",
   "name": "Navo AI",
   "short_name": "Navo",
   "description": "Navo AI — o‘zbek tilidagi aqlli yordamchingiz.",
   "lang": "uz",
-  "start_url": "/",
+  "start_url": "/app/",
+  "scope": "/",
   "display": "standalone",
   "background_color": "#10131f",
   "theme_color": "#10131f",
   "icons": [
     { "src": "/logo-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any" },
     { "src": "/logo-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any" },
-    { "src": "/logo.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+    { "src": "/maskable-192.png", "sizes": "192x192", "type": "image/png", "purpose": "maskable" },
+    { "src": "/maskable-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
   ]
 }

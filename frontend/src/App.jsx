@@ -12,6 +12,7 @@ import {
   UserRound, Volume2, X, Zap,
 } from "lucide-react";
 import { apiRequest, post } from "./api.js";
+import { useInstallPrompt } from "./pwa.js";
 import {
   loginAccount, logoutAccount, registerAccount, requestPasswordReset as sendPasswordReset,
   resendOtp as resendAuthOtp, resetPassword, startGoogleLogin, verifyLoginOtp, verifyOtp,
@@ -280,6 +281,7 @@ function authErrorMessage(error, fallback = "Xatolik bor. Qayta urinib ko‘ring
 }
 
 export default function App() {
+  const { canInstall, iosHint, promptInstall } = useInstallPrompt();
   const [user, setUser] = useState(null);
   const [authReady, setAuthReady] = useState(false);
   const [authMode, setAuthMode] = useState("register");
@@ -337,10 +339,15 @@ export default function App() {
   const messagesEndRef = useRef(null);
   const fileInputRef = useRef(null);
   const composerRef = useRef(null);
+  const toastTimerRef = useRef(null);
 
-  const notify = useCallback((message) => {
+  const notify = useCallback((message, duration = 2600) => {
+    window.clearTimeout(toastTimerRef.current);
     setToast(message);
-    window.setTimeout(() => setToast(""), 2600);
+    toastTimerRef.current = window.setTimeout(() => {
+      setToast("");
+      toastTimerRef.current = null;
+    }, duration);
   }, []);
 
   function changeAuthField(field, value) {
@@ -1050,6 +1057,13 @@ export default function App() {
           <button className="sidebar-link" onClick={() => setDialog("stats")}><BarChart3 size={17} /><span>Statistika</span></button>
           <button className="sidebar-link" onClick={() => setDialog("help")}><CircleHelp size={17} /><span>Yordam markazi</span><ArrowRight size={14} /></button>
           <button className="sidebar-link" onClick={() => setDialog("settings")}><Settings2 size={17} /><span>Sozlamalar</span></button>
+          {(canInstall || iosHint) && <button className="sidebar-link" type="button" onClick={() => {
+            if (iosHint) {
+              notify("Safari'da Ulashish -> Bosh ekranga qo'shish", 6000);
+              return;
+            }
+            promptInstall().catch((error) => notify(error.message));
+          }}><MonitorSmartphone size={17} /><span>Ilovani o‘rnatish</span></button>}
           <div className="account-row">
             <button className="account-card" onClick={() => { setProfile({ nickname: user.nickname || user.name || "", avatar: user.avatar || "" }); setDialog("profile"); }} title="Profilni ochish">
               <span className={`avatar ${user.avatar ? "avatar-image" : ""}`}>{user.avatar ? <img src={user.avatar} alt="" /> : initials(user.nickname || user.name)}</span>

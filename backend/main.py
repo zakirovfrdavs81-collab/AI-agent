@@ -99,7 +99,9 @@ def is_production() -> bool:
 def validate_database_configuration(database_url: str, require_database_url: bool, production: bool):
     if (require_database_url or production) and not database_url:
         raise RuntimeError(
-            "DATABASE_URL is required in production; SQLite is disabled to prevent data loss."
+            "DATABASE_URL is required in production; SQLite is disabled to prevent data loss. "
+            "Add DATABASE_URL in Render Dashboard -> Environment, for example "
+            "'postgresql://<user>:<password>@<host>:5432/<database>'."
         )
 
 
@@ -203,6 +205,7 @@ DIST_MEDIA_TYPES = {
     ".webmanifest": "application/manifest+json",
     ".json": "application/json",
     ".txt": "text/plain; charset=utf-8",
+    ".html": "text/html; charset=utf-8",
 }
 
 
@@ -210,15 +213,21 @@ DIST_MEDIA_TYPES = {
 @app.get("/logo.svg", include_in_schema=False)
 @app.get("/logo-192.png", include_in_schema=False)
 @app.get("/logo-512.png", include_in_schema=False)
+@app.get("/maskable-192.png", include_in_schema=False)
+@app.get("/maskable-512.png", include_in_schema=False)
 @app.get("/apple-touch-icon.png", include_in_schema=False)
 @app.get("/apple-touch-icon-precomposed.png", include_in_schema=False)
+@app.get("/offline.html", include_in_schema=False)
 @app.get("/robots.txt", include_in_schema=False)
 @app.get("/app/favicon.ico", include_in_schema=False)
 @app.get("/app/logo.svg", include_in_schema=False)
 @app.get("/app/logo-192.png", include_in_schema=False)
 @app.get("/app/logo-512.png", include_in_schema=False)
+@app.get("/app/maskable-192.png", include_in_schema=False)
+@app.get("/app/maskable-512.png", include_in_schema=False)
 @app.get("/app/apple-touch-icon.png", include_in_schema=False)
 @app.get("/app/apple-touch-icon-precomposed.png", include_in_schema=False)
+@app.get("/app/offline.html", include_in_schema=False)
 async def dist_root_file(request: Request):
     """Logotip, favicon kabi dist yoki public ildizidagi fayllar."""
     name = Path(request.url.path).name
@@ -1164,18 +1173,22 @@ async def application():
 
 
 @app.get("/manifest.webmanifest")
-async def manifest():
-    return FileResponse(FRONTEND_ROOT / "manifest.webmanifest", media_type="application/manifest+json")
-
-
 @app.get("/sw.js")
-async def service_worker():
-    worker = FRONTEND_ROOT / "sw.js"
-    if not worker.is_file():
-        worker = FRONTEND_ROOT / "js" / "sw.js"
-    if not worker.is_file():
-        raise HTTPException(status_code=404, detail="Service worker fayli topilmadi.")
-    return FileResponse(worker, media_type="application/javascript")
+async def pwa_file(request: Request):
+    name = Path(request.url.path).name
+    target = DIST / name
+    if not target.is_file():
+        target = (FRONTEND_ROOT / "public") / name
+    if not target.is_file():
+        raise HTTPException(404, "PWA fayli topilmadi.")
+    headers = {"Cache-Control": "no-cache"}
+    if name == "sw.js":
+        headers["Service-Worker-Allowed"] = "/"
+    return FileResponse(
+        target,
+        media_type="application/manifest+json" if name == "manifest.webmanifest" else "application/javascript",
+        headers=headers,
+    )
 
 
 @app.get("/api/config")

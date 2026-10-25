@@ -260,9 +260,18 @@ npm install && pip install -r backend/requirements.txt && npm run build
 
 `render.yaml` avtomatik belgilaydigan `ENVIRONMENT=production`, `HOST=0.0.0.0`, `REQUIRE_DATABASE_URL=true`, `EMAIL_PROVIDER=brevo` va `DEV_SHOW_OTP=false` ni o'zgartirmang. Quyidagi `sync: false` qiymatlarini Render Dashboard'da to'ldiring:
 
+**Deploy `DATABASE_URL is required in production` xatosi bilan to'xtasa:**
+
+1. Render Dashboard'da **New +** -> **PostgreSQL** orqali PostgreSQL baza yarating yoki mavjud PostgreSQL bazangizdan foydalaning. Render bazasi va Web Service bir regionda bo'lishi tavsiya etiladi.
+2. Database sahifasidan connection string'ni oling. Render PostgreSQL uchun **Internal Database URL** ni tanlang; tashqi provayder bo'lsa uning ulanish URI'sidan foydalaning.
+3. Web Service -> **Environment** sahifasida `DATABASE_URL` kalitini yarating va URI'ni qiymat sifatida kiriting. `render.yaml` dagi `sync: false` bu maxfiy qiymatni avtomatik yaratmaydi.
+4. **Save, rebuild, and deploy** ni tanlang. Deploy Logs'da server muvaffaqiyatli ishga tushganini, so'ng `https://<Render-domeni>/api/health` javobi `200` ekanini tekshiring.
+
+`REQUIRE_DATABASE_URL` ni o'chirib muammoni chetlab o'tmang: bu production'da SQLite ishlatib, deploy yoki restart'dan keyin foydalanuvchi ma'lumotlari yo'qolishiga olib kelishi mumkin.
+
 | O'zgaruvchi | Maxfiymi? | Qiymat qayerdan olinadi / nimaga bog'liq |
 | --- | --- | --- |
-| `DATABASE_URL` | Ha | Neon yoki Supabase PostgreSQL loyihasining pooled/direct ulanish URI'si. `sslmode` berilmagan URI'ga ilova `sslmode=require` qo'shadi; mavjud `sslmode` saqlanadi. |
+| `DATABASE_URL` | Ha | Render PostgreSQL'ning Internal Database URL'i yoki Neon/Supabase PostgreSQL ulanish URI'si. `sslmode` berilmagan URI'ga ilova `sslmode=require` qo'shadi; mavjud `sslmode` saqlanadi. |
 | `APP_ORIGIN` | Yo'q | Render Web Service domeni yoki biriktirilgan custom domain, `https://` bilan va oxirgi `/` siz. |
 | `FRONTEND_ORIGIN` | Yo'q | Shu yagona servisdagi frontend origin; odatda `APP_ORIGIN` bilan bir xil. |
 | `CORS_ALLOWED_ORIGINS` | Yo'q | Ruxsat etiladigan aniq origin(lar), masalan servisning HTTPS origin'i; bir nechta qiymat vergul bilan. `*` ishlatmang. |
@@ -277,6 +286,18 @@ npm install && pip install -r backend/requirements.txt && npm run build
 | `ESKIZ_PASSWORD` | Ha | SMS ishlatilsa Eskiz paroli. Email uchun shart emas. |
 
 `PORT` ni qo'lda kiritmang: Render uni runtime'da beradi. `PYTHON_VERSION`, `HOST`, `ENVIRONMENT`, `REQUIRE_DATABASE_URL`, `EMAIL_PROVIDER`, `DEV_SHOW_OTP` va `OTP_MODE` esa `render.yaml` dagi qiymatlar bilan beriladi. Google OAuth ishlatmasangiz, callback sozlamalari zarur emas, lekin `GOOGLE_REDIRECT_URI` kiritilmaguncha Google login ishlamaydi. CORS middleware faqat `CORS_ALLOWED_ORIGINS` dagi originlarga ruxsat beradi; yagona domenli frontend/API uchun shu domenni kiriting.
+
+### Render + Dockerfile
+
+Web Service Dockerfile orqali deploy qilinsa, `render.yaml` dagi muhit o'zgaruvchilari avtomatik qo'llanmaydi. Render Dashboard -> **Environment** sahifasida kerakli qiymatlarni qo'lda qo'shing:
+
+- `DATABASE_URL`: Neon yoki Supabase PostgreSQL URI'si. Xavfsiz namuna: `postgresql://<user>:<password>@<host>:5432/<database>`; haqiqiy URI'ni repository'ga yozmang.
+- `SESSION_SECRET`: kamida 32 belgili tasodifiy maxfiy qiymat.
+- `APP_ORIGIN`, `FRONTEND_ORIGIN`, `CORS_ALLOWED_ORIGINS`: Render domeningizning `https://` origin'i.
+- `GOOGLE_REDIRECT_URI`: `https://<Render-domeni>/api/auth/google/callback`.
+- `GEMINI_API_KEY`, `BREVO_API_KEY`, `BREVO_SENDER_EMAIL` va `EMAIL_PROVIDER=brevo`.
+
+`DATABASE_URL` bo'lmasa production'da SQLite'ga qaytish o'rniga server ataylab ishga tushmaydi. Dockerfile Render taqdim etgan `PORT` bilan serverni boshlaydi va `/api/health` endpointini tekshiradi; `PORT` ni qo'lda belgilamang.
 
 ### SQLite ma'lumotlarini PostgreSQL'ga ko'chirish
 

@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="uz">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#10131f">
+    <title>Internet aloqasi yo‘q — Navo AI</title>
+    <style>
+      :root { color-scheme: dark; font-family: system-ui, sans-serif; background: #10131f; color: #f4f2fa; }
+      body { min-height: 100vh; margin: 0; display: grid; place-items: center; text-align: center; }
+      main { max-width: 28rem; padding: 2rem; }
+      h1 { font-size: 1.5rem; }
+      p { color: #aaa8b8; }
+      button { padding: .7rem 1rem; border: 0; border-radius: .5rem; background: #6954d8; color: white; font: inherit; cursor: pointer; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>Internet aloqasi yo‘q</h1>
+      <p>Ulanish tiklangach sahifa avtomatik yangilanadi.</p>
+      <button type="button" onclick="location.reload()">Qayta urinish</button>
+    </main>
+    <script>window.addEventListener("online", () => window.location.reload());</script>
+  </body>
+</html>

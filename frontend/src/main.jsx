@@ -1,7 +1,10 @@
 import React from "react";
 import { createRoot } from "react-dom/client";
 import App from "./App.jsx";
+import { registerServiceWorker } from "./pwa.js";
 import "./styles.css";
+
+registerServiceWorker();
 
 class AppErrorBoundary extends React.Component {
   state = { failed: false };

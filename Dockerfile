@@ -41,7 +41,6 @@ COPY frontend/css ./frontend/css
 COPY frontend/js ./frontend/js
 COPY frontend/showcase ./frontend/showcase
 COPY frontend/public ./frontend/public
-COPY frontend/manifest.webmanifest ./frontend/manifest.webmanifest
 
 # 1-bosqichda yig'ilgan frontend build natijasini nusxalash
 COPY --from=frontend-builder /app/frontend/dist ./frontend/dist
@@ -58,9 +57,9 @@ ENV HOST=0.0.0.0 \
 
 EXPOSE 5507
 
-# Healthcheck endpointi (/health)
+# Healthcheck Render bergan PORT va ilovaning health endpointidan foydalanadi.
 HEALTHCHECK --interval=30s --timeout=5s --start-period=10s --retries=3 \
-    CMD curl -f http://127.0.0.1:${PORT}/health || exit 1
+    CMD curl -f http://127.0.0.1:${PORT}/api/health || exit 1
 
 # Uvicorn serverini reverse proxy va xavfsizlik sozlamalari bilan ishga tushirish
 CMD ["sh", "-c", "uvicorn backend.main:app --host ${HOST} --port ${PORT} --proxy-headers"]
