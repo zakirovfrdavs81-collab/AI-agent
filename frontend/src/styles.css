@@ -220,6 +220,7 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .thinking-indicator span:last-child { width: auto; height: auto; margin-left: 5px; color: var(--muted); background: none; animation: none; font-size: 12px; }
 .error-banner { display: flex; align-items: flex-start; gap: 9px; padding: 11px; color: #f1a6bc; background: rgba(232,115,148,.08); border: 1px solid rgba(232,115,148,.16); border-radius: 10px; font-size: 10px; }
 .error-banner > span { flex: 1; }.error-banner button { padding: 1px; color: inherit; cursor: pointer; background: none; border: 0; }
+.composer-error { width: min(850px,100%); margin: 0 auto 8px; }
 
 .composer-zone { width: min(890px,100%); padding: 10px 26px 11px; margin: 0 auto; }
 .composer { padding: 10px; background: rgba(19,20,30,.85); border-color: rgba(212,205,246,.13); border-radius: 16px; box-shadow: 0 18px 55px rgba(0,0,0,.2), inset 0 1px rgba(255,255,255,.027); transition: border-color .2s ease,box-shadow .2s ease; }
