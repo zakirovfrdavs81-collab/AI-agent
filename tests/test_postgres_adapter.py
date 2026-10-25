@@ -77,6 +77,45 @@ class PostgreSQLAdapterTests(unittest.TestCase):
             [("INSERT INTO users(email) VALUES (%s) RETURNING id", ("a",))],
         )
 
+    def test_add_usage_qualifies_conflicting_messages_column_for_postgresql(self):
+        raw_connection = FakeConnection()
+        connection = PostgreSQLConnection(raw_connection)
+
+        with (
+            patch.object(main, "DATABASE_URL", "postgresql://configured"),
+            patch.object(main, "db", return_value=connection),
+        ):
+            main.add_usage(7)
+
+        self.assertEqual(len(raw_connection.statements), 1)
+        statement, parameters = raw_connection.statements[0]
+        self.assertIn("DO UPDATE SET messages=usage.messages+1", statement)
+        self.assertEqual(parameters[0], 7)
+
+    def test_add_usage_increments_conflicting_sqlite_row(self):
+        with tempfile.TemporaryDirectory() as temp_dir:
+            database_path = Path(temp_dir) / "usage.db"
+            with closing(sqlite3.connect(database_path)) as connection, connection:
+                connection.execute(
+                    "CREATE TABLE usage(user_id INTEGER, day TEXT, messages INTEGER, PRIMARY KEY(user_id, day))"
+                )
+                connection.execute("INSERT INTO usage VALUES (7, '2026-10-25', 2)")
+
+            with (
+                patch.object(main, "DATABASE_URL", ""),
+                patch.object(main, "DB", database_path),
+                patch.object(main.time, "strftime", return_value="2026-10-25"),
+            ):
+                main.add_usage(7)
+
+            with closing(sqlite3.connect(database_path)) as connection:
+                row = connection.execute(
+                    "SELECT messages FROM usage WHERE user_id=? AND day=?",
+                    (7, "2026-10-25"),
+                ).fetchone()
+
+        self.assertEqual(row[0], 3)
+
     def test_database_schema_uses_postgresql_identity_columns(self):
         raw_connection = FakeConnection()
         wrapped_connection = PostgreSQLConnection(raw_connection)

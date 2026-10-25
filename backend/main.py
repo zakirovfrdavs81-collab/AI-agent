@@ -711,7 +711,7 @@ def add_usage(user_id: int):
     with db() as connection:
         connection.execute(
             "INSERT INTO usage(user_id, day, messages) VALUES (?, ?, 1) "
-            "ON CONFLICT(user_id, day) DO UPDATE SET messages=messages+1",
+            "ON CONFLICT(user_id, day) DO UPDATE SET messages=usage.messages+1",
             (user_id, time.strftime("%Y-%m-%d")),
         )
 
