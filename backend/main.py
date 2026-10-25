@@ -2299,7 +2299,8 @@ async def model_info():
 
 # --- Chat --------------------------------------------------------------------
 
-CHAT_REQUEST_TIMEOUT_SECONDS = 20
+CHAT_REQUEST_TIMEOUT_SECONDS = 45
+CHAT_MODEL_TIMEOUT_SECONDS = 12
 
 
 @app.post("/api/chat")
@@ -2329,7 +2330,7 @@ async def chat(payload: ChatInput, session: str | None = Cookie(default=None)):
                             f"https://generativelanguage.googleapis.com/{GEMINI_API_VERSION}/models/{model}:generateContent",
                             headers={"x-goog-api-key": key},
                             json={"contents": [{"parts": parts}]},
-                            timeout=httpx.Timeout(25, connect=10),
+                            timeout=httpx.Timeout(CHAT_MODEL_TIMEOUT_SECONDS, connect=8),
                         )
                     except httpx.TimeoutException as error:
                         logging.warning("Gemini model %s timed out; trying the next available model.", model)

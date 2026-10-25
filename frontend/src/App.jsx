@@ -690,7 +690,7 @@ export default function App() {
     const stamp = Math.floor(Date.now() / 1000);
     const optimisticMessage = { role: "user", content: userText, files: pendingFiles.map((file) => file.name), at: stamp };
     const requestController = new AbortController();
-    const requestTimeout = window.setTimeout(() => requestController.abort(), 23_000);
+    const requestTimeout = window.setTimeout(() => requestController.abort(), 48_000);
     setMessages((current) => [...current, optimisticMessage]);
     if (!override.prompt) setDraft("");
     setFiles([]);
