@@ -690,7 +690,7 @@ export default function App() {
     const stamp = Math.floor(Date.now() / 1000);
     const optimisticMessage = { role: "user", content: userText, files: pendingFiles.map((file) => file.name), at: stamp };
     const requestController = new AbortController();
-    const requestTimeout = window.setTimeout(() => requestController.abort(), 48_000);
+    const requestTimeout = window.setTimeout(() => requestController.abort(), 23_000);
     setMessages((current) => [...current, optimisticMessage]);
     if (!override.prompt) setDraft("");
     setFiles([]);
@@ -1126,7 +1126,7 @@ export default function App() {
           </section> : <section className="messages" aria-live="polite">
             {visibleMessages.map((message) => { const index = messages.indexOf(message); return <ChatMessage key={`${conversationId || "new"}-${index}`} message={message} index={index} query={messageQuery} copied={copiedId === index} speaking={speakingId === index} onCopy={() => copyMessage(message.content, index)} onRead={() => toggleReadAloud(message, index)} onEdit={() => editMessage(message)} onResend={() => resendMessage(message)} />; })}
             {messageQuery && visibleMessages.length === 0 && <div className="search-empty"><Search size={16} /><span>«{messageQuery}» bo‘yicha xabar topilmadi.</span></div>}
-            {sending && <div className="message assistant-message"><span className="assistant-avatar"><Sparkles size={15} /></span><div className="message-body"><div className="thinking-indicator"><span /><span /><span /></div></div></div>}
+            {sending && <div className="message assistant-message"><span className="assistant-avatar"><Sparkles size={15} /></span><div className="message-body"><div className="thinking-indicator" role="status" aria-label="Javob tayyorlanmoqda"><span /><span /><span /><span>Javob tayyorlanmoqda…</span></div></div></div>}
             <div ref={messagesEndRef} />
           </section>}
           {chatError && <div className="error-banner"><Activity size={16} /><span>{chatError}</span><button onClick={() => setChatError("")}><X size={15} /></button></div>}

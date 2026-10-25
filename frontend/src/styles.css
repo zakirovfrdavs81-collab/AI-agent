@@ -214,9 +214,10 @@ button:disabled { cursor: not-allowed; opacity: .55; }
 .copy-button { display: inline-flex; min-height: 26px; flex: 0 1 auto; align-items: center; gap: 5px; padding: 4px 0; color: var(--subtle); cursor: pointer; background: none; border: 0; font-size: 10px; white-space: nowrap; opacity: 0; transition: opacity .16s ease,color .16s ease; }
 .message-body:hover .copy-button,.copy-button:focus-visible { opacity: 1; }.copy-button:hover { color: var(--text); }
 .message-time { margin-left: auto; }
-.thinking-indicator { display: inline-flex; gap: 5px; padding: 9px; }
+.thinking-indicator { display: inline-flex; align-items: center; gap: 5px; padding: 9px; }
 .thinking-indicator span { width: 5px; height: 5px; background: var(--violet); border-radius: 50%; animation: think 1s ease-in-out infinite alternate; }
 .thinking-indicator span:nth-child(2) { animation-delay: .16s; background: var(--mint); }.thinking-indicator span:nth-child(3) { animation-delay: .32s; background: var(--pink); }
+.thinking-indicator span:last-child { width: auto; height: auto; margin-left: 5px; color: var(--muted); background: none; animation: none; font-size: 12px; }
 .error-banner { display: flex; align-items: flex-start; gap: 9px; padding: 11px; color: #f1a6bc; background: rgba(232,115,148,.08); border: 1px solid rgba(232,115,148,.16); border-radius: 10px; font-size: 10px; }
 .error-banner > span { flex: 1; }.error-banner button { padding: 1px; color: inherit; cursor: pointer; background: none; border: 0; }
 

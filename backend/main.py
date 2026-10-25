@@ -2299,7 +2299,7 @@ async def model_info():
 
 # --- Chat --------------------------------------------------------------------
 
-CHAT_REQUEST_TIMEOUT_SECONDS = 45
+CHAT_REQUEST_TIMEOUT_SECONDS = 20
 
 
 @app.post("/api/chat")
