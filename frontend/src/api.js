@@ -13,7 +13,10 @@ export async function apiRequest(path, options = {}) {
         ...options.headers,
       },
     });
-  } catch {
+  } catch (error) {
+    if (error?.name === "AbortError") {
+      throw new Error("AI javobi juda uzoq kutildi. Savolingiz maydonda qoldi — birozdan so‘ng qayta yuboring.");
+    }
     throw new Error("Serverga ulanib bo‘lmadi. Backend ishlayotganini tekshiring.");
   }
 
@@ -39,6 +42,6 @@ export async function apiRequest(path, options = {}) {
   return data;
 }
 
-export function post(path, body) {
-  return apiRequest(path, { method: "POST", body: JSON.stringify(body) });
+export function post(path, body, options = {}) {
+  return apiRequest(path, { ...options, method: "POST", body: JSON.stringify(body) });
 }

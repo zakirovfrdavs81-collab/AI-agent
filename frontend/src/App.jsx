@@ -689,6 +689,8 @@ export default function App() {
     const userText = prompt || "Biriktirilgan fayl(lar)ni tahlil qilib bering.";
     const stamp = Math.floor(Date.now() / 1000);
     const optimisticMessage = { role: "user", content: userText, files: pendingFiles.map((file) => file.name), at: stamp };
+    const requestController = new AbortController();
+    const requestTimeout = window.setTimeout(() => requestController.abort(), 48_000);
     setMessages((current) => [...current, optimisticMessage]);
     if (!override.prompt) setDraft("");
     setFiles([]);
@@ -697,7 +699,11 @@ export default function App() {
         const encoded = await fileAsBase64(file);
         return { name: file.name, mime_type: file.type || "application/octet-stream", data: encoded.data };
       }));
-      const result = await post("/chat", { prompt: userText, conversation_id: conversationId || null, attachments });
+      const result = await post(
+        "/chat",
+        { prompt: userText, conversation_id: conversationId || null, attachments },
+        { signal: requestController.signal },
+      );
       if (result.conversation_id) setConversationId(result.conversation_id);
       if (typeof result.used_today === "number") setUsage({ used: result.used_today, limit: result.daily_limit || usage.limit });
       if (result.notes?.length) notify(result.notes.join(" "));
@@ -713,6 +719,7 @@ export default function App() {
       }
       setChatError(error.message);
     } finally {
+      window.clearTimeout(requestTimeout);
       setSending(false);
       composerRef.current?.focus();
     }
@@ -1120,9 +1127,9 @@ export default function App() {
             {visibleMessages.map((message) => { const index = messages.indexOf(message); return <ChatMessage key={`${conversationId || "new"}-${index}`} message={message} index={index} query={messageQuery} copied={copiedId === index} speaking={speakingId === index} onCopy={() => copyMessage(message.content, index)} onRead={() => toggleReadAloud(message, index)} onEdit={() => editMessage(message)} onResend={() => resendMessage(message)} />; })}
             {messageQuery && visibleMessages.length === 0 && <div className="search-empty"><Search size={16} /><span>«{messageQuery}» bo‘yicha xabar topilmadi.</span></div>}
             {sending && <div className="message assistant-message"><span className="assistant-avatar"><Sparkles size={15} /></span><div className="message-body"><div className="thinking-indicator"><span /><span /><span /></div></div></div>}
-            {chatError && <div className="error-banner"><Activity size={16} /><span>{chatError}</span><button onClick={() => setChatError("")}><X size={15} /></button></div>}
             <div ref={messagesEndRef} />
           </section>}
+          {chatError && <div className="error-banner"><Activity size={16} /><span>{chatError}</span><button onClick={() => setChatError("")}><X size={15} /></button></div>}
         </div>
         {dropActive && <div className="drop-overlay"><div className="drop-card"><Upload size={26} /><strong>Fayllarni shu yerga tashlang</strong><span>Ko‘pi bilan {MAX_FILES} ta fayl · har biri 12 MB gacha</span></div></div>}
         {showJump && <button className="jump-button" type="button" onClick={jumpToBottom}><ChevronDown size={16} /> Oxirgi xabarga o‘tish</button>}

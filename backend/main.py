@@ -2299,6 +2299,9 @@ async def model_info():
 
 # --- Chat --------------------------------------------------------------------
 
+CHAT_REQUEST_TIMEOUT_SECONDS = 45
+
+
 @app.post("/api/chat")
 async def chat(payload: ChatInput, session: str | None = Cookie(default=None)):
     user = session_user(session)
@@ -2317,62 +2320,69 @@ async def chat(payload: ChatInput, session: str | None = Cookie(default=None)):
     parts.extend(file_parts)
     data: dict = {}
     try:
-        async with httpx.AsyncClient(timeout=90) as client:
-            queue = await model_queue_for(client, key)
-            for index, model in enumerate(queue):
-                try:
-                    response = await client.post(
-                        f"https://generativelanguage.googleapis.com/{GEMINI_API_VERSION}/models/{model}:generateContent",
-                        headers={"x-goog-api-key": key},
-                        json={"contents": [{"parts": parts}]},
-                        timeout=httpx.Timeout(25, connect=10),
+        async with asyncio.timeout(CHAT_REQUEST_TIMEOUT_SECONDS):
+            async with httpx.AsyncClient(timeout=CHAT_REQUEST_TIMEOUT_SECONDS) as client:
+                queue = await model_queue_for(client, key)
+                for index, model in enumerate(queue):
+                    try:
+                        response = await client.post(
+                            f"https://generativelanguage.googleapis.com/{GEMINI_API_VERSION}/models/{model}:generateContent",
+                            headers={"x-goog-api-key": key},
+                            json={"contents": [{"parts": parts}]},
+                            timeout=httpx.Timeout(25, connect=10),
+                        )
+                    except httpx.TimeoutException as error:
+                        logging.warning("Gemini model %s timed out; trying the next available model.", model)
+                        if index < len(queue) - 1:
+                            continue
+                        raise HTTPException(
+                            504,
+                            "Gemini modellari javob berishga kechikdi. Bir ozdan so‘ng qayta urinib ko‘ring.",
+                        ) from error
+                    try:
+                        data = response.json() if response.content else {}
+                    except ValueError as error:
+                        logging.error(
+                            "Gemini API returned invalid JSON (HTTP %s).",
+                            response.status_code,
+                        )
+                        raise HTTPException(
+                            502,
+                            "Gemini xizmati noto‘g‘ri javob qaytardi. Birozdan so‘ng qayta urinib ko‘ring.",
+                        ) from error
+                    if not isinstance(data, dict):
+                        logging.error(
+                            "Gemini API returned an unexpected JSON response (HTTP %s).",
+                            response.status_code,
+                        )
+                        raise HTTPException(
+                            502,
+                            "Gemini xizmati kutilmagan javob qaytardi. Birozdan so‘ng qayta urinib ko‘ring.",
+                        )
+                    error_data = data.get("error")
+                    detail = str(error_data.get("message", "")) if isinstance(error_data, dict) else ""
+                    if response.status_code < 400:
+                        _model_probe.update({"name": model, "checked": time.time()})
+                        break
+                    retryable = model_is_missing(response.status_code, detail) or model_is_busy(
+                        response.status_code, detail
                     )
-                except httpx.TimeoutException as error:
-                    logging.warning("Gemini model %s timed out; trying the next available model.", model)
-                    if index < len(queue) - 1:
+                    if retryable and index < len(queue) - 1:
+                        logging.warning(
+                            "Gemini model %s returned %s; trying the next available model.",
+                            model,
+                            response.status_code,
+                        )
                         continue
-                    raise HTTPException(
-                        504,
-                        "Gemini modellari javob berishga kechikdi. Bir ozdan so‘ng qayta urinib ko‘ring.",
-                    ) from error
-                try:
-                    data = response.json() if response.content else {}
-                except ValueError as error:
-                    logging.error(
-                        "Gemini API returned invalid JSON (HTTP %s).",
-                        response.status_code,
-                    )
-                    raise HTTPException(
-                        502,
-                        "Gemini xizmati noto‘g‘ri javob qaytardi. Birozdan so‘ng qayta urinib ko‘ring.",
-                    ) from error
-                if not isinstance(data, dict):
-                    logging.error(
-                        "Gemini API returned an unexpected JSON response (HTTP %s).",
-                        response.status_code,
-                    )
-                    raise HTTPException(
-                        502,
-                        "Gemini xizmati kutilmagan javob qaytardi. Birozdan so‘ng qayta urinib ko‘ring.",
-                    )
-                error_data = data.get("error")
-                detail = str(error_data.get("message", "")) if isinstance(error_data, dict) else ""
-                if response.status_code < 400:
-                    _model_probe.update({"name": model, "checked": time.time()})
-                    break
-                retryable = model_is_missing(response.status_code, detail) or model_is_busy(
-                    response.status_code, detail
-                )
-                if retryable and index < len(queue) - 1:
-                    logging.warning(
-                        "Gemini model %s returned %s; trying the next available model.",
-                        model,
-                        response.status_code,
-                    )
-                    continue
-                raise gemini_error(response.status_code, detail)
+                    raise gemini_error(response.status_code, detail)
     except HTTPException:
         raise
+    except TimeoutError as error:
+        logging.warning("Gemini chat request exceeded the %s-second response deadline.", CHAT_REQUEST_TIMEOUT_SECONDS)
+        raise HTTPException(
+            504,
+            "AI javobi juda uzoq kutildi. Savolingiz maydonda qoladi — birozdan so‘ng qayta yuboring.",
+        ) from error
     except httpx.HTTPError as error:
         logging.error("Gemini API transport failure: %s", type(error).__name__)
         raise HTTPException(

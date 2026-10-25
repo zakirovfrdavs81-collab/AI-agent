@@ -3,14 +3,33 @@ import base64
 import io
 import unittest
 import zipfile
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import httpx
+from fastapi import HTTPException
 
 from backend import main
 
 
 class BackendErrorHandlingTests(unittest.TestCase):
+    def test_chat_returns_timeout_error_when_model_discovery_hangs(self):
+        async def wait_forever(*args):
+            await asyncio.Event().wait()
+
+        with (
+            patch.dict("os.environ", {"GEMINI_API_KEY": "test-key"}),
+            patch.object(main, "session_user", return_value={"id": 1}),
+            patch.object(main, "usage_today", return_value=0),
+            patch.object(main, "CHAT_REQUEST_TIMEOUT_SECONDS", 0.01),
+            patch.object(main, "model_queue_for", new=AsyncMock(side_effect=wait_forever)),
+            self.assertLogs(level="WARNING"),
+        ):
+            with self.assertRaises(HTTPException) as raised:
+                asyncio.run(main.chat(main.ChatInput(prompt="test savol")))
+
+        self.assertEqual(raised.exception.status_code, 504)
+        self.assertIn("juda uzoq", raised.exception.detail)
+
     def test_gemini_model_discovery_handles_invalid_json(self):
         response = httpx.Response(
             200,
