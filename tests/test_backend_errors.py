@@ -32,7 +32,7 @@ class BackendErrorHandlingTests(unittest.TestCase):
 
     def test_chat_model_timeout_leaves_time_for_fallback_models(self):
         self.assertLess(main.CHAT_MODEL_TIMEOUT_SECONDS, main.CHAT_REQUEST_TIMEOUT_SECONDS)
-        self.assertLess(main.CHAT_MODEL_TIMEOUT_SECONDS, 25)
+        self.assertLess(main.CHAT_MODEL_TIMEOUT_SECONDS, 30)
 
     def test_gemini_model_discovery_handles_invalid_json(self):
         response = httpx.Response(

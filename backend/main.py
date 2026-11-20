@@ -2150,15 +2150,10 @@ async def statistics(session: str | None = Cookie(default=None)):
 
 GEMINI_API_VERSION = os.getenv("GEMINI_API_VERSION", "v1beta")
 PREFERRED_MODELS = (
-    "gemini-3.7-flash",
-    "gemini-3.8-flash",
-    "gemini-3.6-flash",
-    "gemini-3.5-flash",
     "gemini-flash-latest",
-    "gemini-3.8-flash-lite",
     "gemini-2.5-flash",
-    "gemini-flash-lite-latest",
     "gemini-2.5-flash-lite",
+    "gemini-flash-lite-latest",
     "gemini-2.0-flash",
     "gemini-pro-latest",
 )
@@ -2185,6 +2180,7 @@ async def live_models(client: httpx.AsyncClient, key: str) -> list[str]:
             f"https://generativelanguage.googleapis.com/{GEMINI_API_VERSION}/models",
             headers={"x-goog-api-key": key},
             params={"pageSize": 200},
+            timeout=httpx.Timeout(8, connect=5),
         )
     except httpx.HTTPError:
         return []
@@ -2286,7 +2282,7 @@ async def model_info():
     key = os.getenv("GEMINI_API_KEY")
     if not key:
         raise HTTPException(503, "Serverda GEMINI_API_KEY sozlanmagan.")
-    async with httpx.AsyncClient(timeout=30) as client:
+    async with httpx.AsyncClient(timeout=10) as client:
         live = await live_models(client, key)
     return {
         "configured": configured_model(),
@@ -2299,8 +2295,8 @@ async def model_info():
 
 # --- Chat --------------------------------------------------------------------
 
-CHAT_REQUEST_TIMEOUT_SECONDS = 45
-CHAT_MODEL_TIMEOUT_SECONDS = 12
+CHAT_REQUEST_TIMEOUT_SECONDS = 90
+CHAT_MODEL_TIMEOUT_SECONDS = 20
 
 
 @app.post("/api/chat")
